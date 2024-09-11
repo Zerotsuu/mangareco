@@ -1,0 +1,17 @@
+services:
+  db:
+    image: postgres:16
+    container_name: mangareco-db
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=mangareco
+    ports:
+      - '5432:5432'
+    volumes: 
+      - mangareco-db-data:/var/lib/postgresql/data
+
+volumes:
+  mangareco-db-data:
+    name: mangareco-db-data

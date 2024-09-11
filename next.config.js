@@ -5,6 +5,19 @@
 await import("./src/env.js");
 
 /** @type {import("next").NextConfig} */
-const config = {};
+const config = {
+    reactStrictMode: true,
+    i18n: {
+      locales: ["en"],
+      defaultLocale: "en",
+    },
+    images: {
+      domains: [
+        "s4.anilist.co",
+        "img.anili.st",
+        // Add any other AniList CDN domains here
+      ],
+    },
+  };
 
 export default config;

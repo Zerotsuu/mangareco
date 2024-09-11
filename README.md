@@ -1,3 +1,24 @@
+# Manga Reco
+
+## TODO
+
+- [] Deploy
+- [x] Navbar
+- [x] Image Grid
+- [x] Image components
+- [x] Image details
+- [x] Grab images from AniList
+- [] Setup page routing
+- [] Setup Database vercel Postgres
+- [] Add clerk
+- [] error management
+- [] Rate limiting
+- [] Attach database
+- [] Add Collaborative model
+- [] Add Content Filtering model
+- [] Add Hybrid model
+
+
 # Create T3 App
 
 This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
