@@ -26,7 +26,7 @@ export const Navbar: React.FC = () => {
           <Link href="/list" className="text-white">
             Your List
           </Link>
-          <Link href="/profile" className="text-white">
+          <Link href="/login" className="text-white">
             Profile
           </Link>
         </div>
