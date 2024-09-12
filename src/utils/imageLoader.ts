@@ -1,4 +1,4 @@
-import { ImageLoader } from 'next/image';
+import type { ImageLoader } from 'next/image';
 
 export const customImageLoader: ImageLoader = ({ src, width, quality }) => {
   // You can add more logic here to handle different image sources if needed
