@@ -1,27 +1,38 @@
-// src/utils/anilist-api.ts
 import { GraphQLClient } from 'graphql-request';
 
 const ANILIST_API_ENDPOINT = 'https://graphql.anilist.co';
 
 export const anilistClient = new GraphQLClient(ANILIST_API_ENDPOINT);
-interface PopularMangaResponse {
-    Page: {
-      media: {
-        id: number;
-        title: {
-          romaji: string;
-          english: string;
-        };
-        coverImage: {
-          large: string;
-        };
-        description: string;
-        genres: string[];
-        averageScore: number;
-      }[];
-    };
-  }
 
+export interface AnilistManga {
+  id: number;
+  title: {
+    romaji: string;
+    english: string | null;
+  };
+  coverImage: {
+    large: string;
+  };
+  description: string;
+  genres: string[];
+  averageScore: number;
+  staff?: {
+    edges: Array<{
+      role: string;
+      node: {
+        name: {
+          full: string;
+        };
+      };
+    }>;
+  };
+}
+
+interface PopularMangaResponse {
+  Page: {
+    media: AnilistManga[];
+  };
+}
 export const getPopularManga = async (page: number, perPage: number) => {
   const query = `
     query ($page: Int, $perPage: Int) {
@@ -48,7 +59,11 @@ export const getPopularManga = async (page: number, perPage: number) => {
   return data.Page.media;
 };
 
-export const getMangaById = async (id: number) => {
+interface GetMangaByIdResponse {
+  Media: AnilistManga;
+}
+
+export const getMangaById = async (id: number): Promise<AnilistManga> => {
   const query = `
     query ($id: Int) {
       Media(id: $id, type: MANGA) {
@@ -78,6 +93,6 @@ export const getMangaById = async (id: number) => {
   `;
 
   const variables = { id };
-  const data: {Media:any} = await anilistClient.request(query, variables);
+  const data = await anilistClient.request<GetMangaByIdResponse>(query, variables);
   return data.Media;
 };

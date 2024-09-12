@@ -13,10 +13,6 @@ const config = {
     "plugin:@typescript-eslint/stylistic-type-checked"
   ],
   "rules": {
-    "@typescript-eslint\no-explicit-any": "off",
-    "@typescript-eslint\no-unsafe-return": "off",
-    "@typescript-eslint\no-unsafe-assignment": "off",
-    "@typescript-eslint\no-unsafe-member-access": "off",
     "@typescript-eslint/array-type": "off",
     "@typescript-eslint/consistent-type-definitions": "off",
     "@typescript-eslint/consistent-type-imports": [

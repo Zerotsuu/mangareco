@@ -1,14 +1,11 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import type { MangaPreview } from '~/server/api/routers/manga';
 
-import { RouterOutputs } from '~/trpc/react';
-import { customImageLoader } from '~/utils/imageLoader';
-
-type Manga = RouterOutputs['manga']['getPopular'][number];
-
+// type Manga = RouterOutputs['manga']['getPopular'][number];
 interface MangaGridProps {
-  manga: Manga[];
+  manga: MangaPreview[];
 }
 
 export const MangaGrid: React.FC<MangaGridProps> = ({ manga }) => {
@@ -18,7 +15,6 @@ export const MangaGrid: React.FC<MangaGridProps> = ({ manga }) => {
         <Link href={`/manga/${item.id}`} key={item.id} className="block">
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
             <Image
-              // loader={customImageLoader}
               src={item.coverImage}
               alt={item.title}
               width={200}

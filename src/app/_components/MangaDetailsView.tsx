@@ -4,10 +4,19 @@ import React from 'react';
 import Image from 'next/image';
 import { type RouterOutputs } from '~/trpc/react';
 
-type MangaDetails = RouterOutputs['manga']['getById'];
+// type MangaDetails = RouterOutputs['manga']['getById'];
+interface MangaDetails {
+  id: number;
+  title: string;
+  author: string;
+  coverImage: string;
+  averageScore: number;
+  genres: string[];
+  description: string;
+}
 
 interface MangaDetailsViewProps {
-  manga: MangaDetails;
+  manga: MangaDetails | null;
 }
 
 export const MangaDetailsView: React.FC<MangaDetailsViewProps> = ({ manga }) => {
@@ -30,7 +39,7 @@ export const MangaDetailsView: React.FC<MangaDetailsViewProps> = ({ manga }) => 
           <p className="text-gray-600 mt-2">by {manga.author}</p>
           <p className="text-lg font-semibold mt-2">Score: {manga.averageScore}</p>
           <div className="mt-4">
-            {manga.genres.map((genre:any) => (
+            {manga.genres.map((genre: string) => (
               <span
                 key={genre}
                 className="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2"

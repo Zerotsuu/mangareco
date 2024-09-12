@@ -1,8 +1,10 @@
 import { MangaGrid } from '~/app/_components/MangaGrid';
 import { api } from '~/trpc/server';
+import type { MangaPreview } from '~/server/api/routers/manga';
+
 
 export default async function Home() {
-  const popularManga = await api.manga.getPopular({ page: 1, perPage: 20 });
+  const popularManga : MangaPreview[] = await api.manga.getPopular({ page: 1, perPage: 20 });
 
   return (
     <main className="container mx-auto px-4 py-8">

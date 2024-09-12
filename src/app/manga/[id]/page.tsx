@@ -1,8 +1,10 @@
-import { api } from '~/trpc/server';
+import { api } from '~/utils/api';
 import { MangaDetailsView } from '~/app/_components/MangaDetailsView';
 
-export default async function MangaDetails({ params }: { params: { id: string } }) {
-  const manga = await api.manga.getById({ id: parseInt(params.id, 10) });
+export default async function MangaDetails({ params }: { params: { id: number } }) {
+  const { data: manga, isLoading } = api.manga.getById.useQuery({ id: params.id });
 
-  return <MangaDetailsView manga={manga} />;
+  if (isLoading) return <div>Loading...</div>;
+
+  return <MangaDetailsView manga = {manga ?? null} />;
 }
