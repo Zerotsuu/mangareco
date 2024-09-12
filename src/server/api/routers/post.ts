@@ -13,10 +13,11 @@ export const postRouter = createTRPCRouter({
 
   create: publicProcedure
     .input(z.object({ name: z.string().min(1) }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input } : { ctx: any, input: any }) => {
       return ctx.db.post.create({
         data: {
           name: input.name,
+          createdBy: ctx.session.user.id, // or whatever the correct value is
         },
       });
     }),

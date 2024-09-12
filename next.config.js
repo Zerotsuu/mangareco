@@ -15,7 +15,6 @@ const config = {
       domains: [
         "s4.anilist.co",
         "img.anili.st",
-        // Add any other AniList CDN domains here
       ],
     },
   };
