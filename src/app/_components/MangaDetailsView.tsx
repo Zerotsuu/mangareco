@@ -3,7 +3,6 @@
 
 import React from 'react';
 import Image from 'next/image';
-import { type RouterOutputs } from '~/trpc/react';
 
 // type MangaDetails = RouterOutputs['manga']['getById'];
 interface MangaDetails {
