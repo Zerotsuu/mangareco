@@ -1,3 +1,4 @@
+// app/_components/post.tsx
 "use client";
 
 import { useState } from "react";

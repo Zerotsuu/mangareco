@@ -1,3 +1,4 @@
+//app/_components/MangaDetailsView.tsx
 'use client';
 
 import React from 'react';

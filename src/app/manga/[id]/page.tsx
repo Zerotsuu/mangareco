@@ -1,3 +1,4 @@
+// app/manga/[id]/page.tsx
 import { api } from '~/utils/api';
 import { MangaDetailsView } from '~/app/_components/MangaDetailsView';
 

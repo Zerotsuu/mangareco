@@ -1,8 +1,8 @@
+// app/layout.tsx
 import "~/styles/globals.css";
 
-import { GeistSans } from "geist/font/sans";
+import { ClerkProvider, SignInButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 import { type Metadata } from "next";
-import { cookies } from "next/headers";
 import { Navbar } from "~/app/_components/Navbar";
 import { Inter } from "next/font/google";
 
@@ -23,6 +23,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
+    <ClerkProvider>
     <html lang="en">
       <body className={`font-sans ${inter.variable}`}>
         <TRPCReactProvider >
@@ -31,5 +32,6 @@ export default function RootLayout({
         </TRPCReactProvider>
       </body>
     </html>
+    </ClerkProvider>
   );
 }
