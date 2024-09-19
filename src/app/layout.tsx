@@ -1,7 +1,7 @@
 // app/layout.tsx
 import "~/styles/globals.css";
 
-import { ClerkProvider, SignInButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
+import { ClerkProvider } from '@clerk/nextjs'
 import { type Metadata } from "next";
 import { Navbar } from "~/app/_components/Navbar";
 import { Inter } from "next/font/google";

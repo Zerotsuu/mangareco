@@ -1,7 +1,8 @@
-import { postRouter } from "~/server/api/routers/post";
-import { mangaRouter } from "~/server/api/routers/manga";
+
+import { mangaRouter } from "~/server/api/routers/manga"; 
+import { mangaListRouter } from "~/server/api/routers/mangaList";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
-import { getLayoutOrPageModule } from "next/dist/server/lib/app-dir-module";
+// import { getLayoutOrPageModule } from "next/dist/server/lib/app-dir-module";
 
 /**
  * This is the primary router for your server.
@@ -9,8 +10,8 @@ import { getLayoutOrPageModule } from "next/dist/server/lib/app-dir-module";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = createTRPCRouter({
-  post: postRouter,
   manga: mangaRouter,
+  mangaList: mangaListRouter,
 });
 
 // export type definition of API

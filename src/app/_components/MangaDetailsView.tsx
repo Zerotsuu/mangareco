@@ -3,6 +3,7 @@
 
 import React from 'react';
 import Image from 'next/image';
+import { AddToListButton } from './AddToListButton';
 
 // type MangaDetails = RouterOutputs['manga']['getById'];
 interface MangaDetails {
@@ -50,6 +51,9 @@ export const MangaDetailsView: React.FC<MangaDetailsViewProps> = ({ manga }) => 
           </div>
           <p className="mt-4">{manga.description}</p>
         </div>
+      </div>
+      <div className='mt-4'>
+        <AddToListButton mangaId={manga.id} />
       </div>
     </div>
   );

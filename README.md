@@ -8,13 +8,15 @@
 - [x] Image components
 - [x] Image details
 - [x] Grab images from AniList
-- [ ] Use Pagination
+- [x] Use Pagination for popular manga
+- [x] Use Infinite scroll pagination
 - [ ] Setup page routing
 - [x] Setup Database vercel Postgres
 - [x] Add clerk
 - [ ] Add UserProfiling
-- [ ] Connect UserData to db table
-- [ ] Add Manga to list db functionality
+- [x] Connect UserData to db table
+- [x] Add Manga to list db functionality
+- [ ] Full CRUD functionality for manga list
 - [ ] Add Search Functionality
 - [ ] Add Advanced Search Functionality
 - [ ] Update image components

@@ -6,6 +6,7 @@
  * TL;DR - This is where all the tRPC server stuff is created and plugged in. The pieces you will
  * need to use are documented accordingly near the end.
  */
+import { auth } from "@clerk/nextjs/server";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
@@ -18,32 +19,17 @@ import { db } from "~/server/db";
  * This section defines the "contexts" that are available in the backend API.
  *
  * These allow you to access things when processing a request, like the database, the session, etc.
+ *
+ * This helper generates the "internals" for a tRPC context. The API handler and RSC clients each
+ * wrap this and provides the required context.
+ *
+ * @see https://trpc.io/docs/server/context
  */
-
-interface CustomSession {
-  userId: string;
-  // Add any other session properties you need
-}
-
-async function getSessionFromCustomAuth(headers: Headers): Promise<CustomSession | null> {
-  // Implement your custom logic to extract and validate the session
-  // This might involve checking cookies, headers, or other auth tokens
-  // Return null if there's no valid session
-  
-  const authToken = headers.get('authorization');
-  if (!authToken) return null;
-  
-  // Validate the token and return the session
-  // This is just a placeholder, implement your actual validation logic
-  const userId = await validateAuthToken(authToken);
-  return userId ? { userId } : null;
-}
-
 export const createTRPCContext = async (opts: { headers: Headers }) => {
-  const session = await getSessionFromCustomAuth(opts.headers);
+  const { userId } = auth();
   return {
     db,
-    session,
+    auth: { userId: userId ?? null },
     ...opts,
   };
 };
@@ -92,11 +78,14 @@ export const createTRPCRouter = t.router;
 
 /**
  * Middleware for timing procedure execution and adding an artificial delay in development.
+ *
+ * You can remove this if you don't like it, but it can help catch unwanted waterfalls by simulating
+ * network latency that would occur in production but not in local development.
  */
 const timingMiddleware = t.middleware(async ({ next, path }) => {
   const start = Date.now();
 
-  if (process.env.NODE_ENV === 'development') {
+  if (t._config.isDev) {
     // artificial delay in dev
     const waitMs = Math.floor(Math.random() * 400) + 100;
     await new Promise((resolve) => setTimeout(resolve, waitMs));
@@ -119,29 +108,16 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
  */
 export const publicProcedure = t.procedure.use(timingMiddleware);
 
-/**
- * Protected (authenticated) procedure
- *
- * This is the base piece you use to build new queries and mutations on your tRPC API that require
- * authentication. It guarantees that a user querying is authorized.
- */
 export const protectedProcedure = t.procedure
   .use(timingMiddleware)
   .use(async ({ ctx, next }) => {
-    if (!ctx.session) {
+    if (!ctx.auth?.userId) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
     return next({
       ctx: {
         ...ctx,
-        session: ctx.session,
+        auth: ctx.auth,
       },
     });
   });
-
-// You'll need to implement this function based on your authentication method
-async function validateAuthToken(token: string): Promise<string | null> {
-  // Implement your token validation logic here
-  // Return the userId if valid, null otherwise
-  return null; // Placeholder return
-}

@@ -30,13 +30,39 @@ export interface AnilistManga {
 
 interface PopularMangaResponse {
   Page: {
+    pageInfo: {
+      total: number;
+      currentPage: number;
+      lastPage: number;
+      hasNextPage: boolean;
+      perPage: number;
+    };
     media: AnilistManga[];
   };
 }
-export const getPopularManga = async (page: number, perPage: number) => {
+
+export interface PaginatedMangaResult {
+  manga: AnilistManga[];
+  pageInfo: {
+    total: number;
+    currentPage: number;
+    lastPage: number;
+    hasNextPage: boolean;
+    perPage: number;
+  };
+}
+
+export const getPopularManga = async (page: number, perPage: number): Promise<PaginatedMangaResult> => {
   const query = `
     query ($page: Int, $perPage: Int) {
       Page(page: $page, perPage: $perPage) {
+        pageInfo {
+          total
+          currentPage
+          lastPage
+          hasNextPage
+          perPage
+        }
         media(type: MANGA, sort: POPULARITY_DESC) {
           id
           title {
@@ -56,7 +82,10 @@ export const getPopularManga = async (page: number, perPage: number) => {
 
   const variables = { page, perPage };
   const data = await anilistClient.request<PopularMangaResponse>(query, variables);
-  return data.Page.media;
+  return {
+    manga: data.Page.media,
+    pageInfo: data.Page.pageInfo
+  };
 };
 
 interface GetMangaByIdResponse {
