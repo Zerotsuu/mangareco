@@ -54,74 +54,50 @@ export const mangaListRouter = createTRPCRouter({
     }),
 
     updateLikeStatus: protectedProcedure
-    .input(z.object({
-      mangaId: z.number(),
-      likeStatus: z.enum(['like', 'dislike']).nullable(),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const userId = ctx.auth.userId!;
-      
-        // Check if user exists, create if not
-        let user = await ctx.db.user.findUnique({ where: { id: userId } });
-        if (!user) {
-          try {
+      .input(z.object({
+        mangaId: z.number(),
+        likeStatus: z.enum(['like', 'dislike']).nullable(),
+      }))
+      .mutation(async ({ ctx, input }) => { const userId = ctx.auth.userId!;
+        try {
+          // Find User
+          let user = await ctx.db.user.findUnique({ where: { id: userId } });
+
+          // Check if user exists, create if not
+          if(!user) {
             user = await ctx.db.user.create({
               data: { id: userId, clerkId: userId },
             });
-          } catch (error) {
-            if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') { //isolated err handling need better implementation
-              const meta = error.meta as { target?: string[] } | undefined;
-              if (meta?.target?.includes('clerkId')) {
-                user = await ctx.db.user.findUnique({ where: { clerkId: userId } });
-                if (!user) {
-                  //boilerplate err handling
-                  console.error('Error creating user:', error);
-                  throw new TRPCError({
-                    code: 'INTERNAL_SERVER_ERROR',
-                  message: 'Failed to create user record',
-                });
-              }
-            } else {
-              console.error('Error creating user:', error);
-              throw new TRPCError({
-                code: 'INTERNAL_SERVER_ERROR',
-                message: 'Failed to create user record',
-              });
-            }
           }
-        }
 
-        //if user not found, throw error
-        if (!user) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'User not found',
-          });
-        }
-
-        // Update like status
-        const updatedItem = await ctx.db.mangaList.upsert({
-          where: {
-            userId_mangaId: {
-              userId: user.id,
+          let mangaListItem = await ctx.db.mangaList.findFirst({
+            where: {
+              userId:user.id,
               mangaId: input.mangaId,
             },
-          },
-          update: {
-            likeStatus: input.likeStatus,
-          },
-          create: {
-            userId: user.id,
-            mangaId: input.mangaId,
-            likeStatus: input.likeStatus,
-            status: 'Plan to Read', // Default status
-          },
-        });
-
-        try {
-          return updatedItem;
-        } catch (error) { //err handling pls need to be improved
-          console.error('Error in updateLikeStatus:', error);
+          });
+           if (mangaListItem) {
+            //Update existing entry
+            mangaListItem = await ctx.db.mangaList.update({
+              where: {id: mangaListItem.id},
+              data: {
+                likeStatus: input.likeStatus,
+              },
+            });
+          } else {
+            //Create new entry
+            mangaListItem = await ctx.db.mangaList.create({
+              data: {
+                userId: user.id,
+                mangaId: input.mangaId,
+                likeStatus: input.likeStatus,
+                status: 'Plan to Read', // Default status
+              },
+            });
+          }
+          return mangaListItem;
+        } catch (error) {
+          console.error('Error updating like status:', error);
           if (error instanceof Prisma.PrismaClientKnownRequestError) {
             console.error('Prisma error code:', error.code);
             console.error('Prisma error message:', error.message);
@@ -131,6 +107,42 @@ export const mangaListRouter = createTRPCRouter({
             message: 'Failed to update like status',
           });
         }
-      }
-    }),
-});
+      }),
+    });
+       
+
+        // Update like status
+//         const updatedItem = await ctx.db.mangaList.upsert({
+//           where: {
+//             userId_mangaId: {
+//               userId: user.id,
+//               mangaId: input.mangaId,
+//             },
+//           },
+//           update: {
+//             likeStatus: input.likeStatus,
+//           },
+//           create: {
+//             userId: user.id,
+//             mangaId: input.mangaId,
+//             likeStatus: input.likeStatus,
+//             status: 'Plan to Read', // Default status
+//           },
+//         });
+
+//         try {
+//           return updatedItem;
+//         } catch (error) { //err handling pls need to be improved
+//           console.error('Error in updateLikeStatus:', error);
+//           if (error instanceof Prisma.PrismaClientKnownRequestError) {
+//             console.error('Prisma error code:', error.code);
+//             console.error('Prisma error message:', error.message);
+//           }
+//           throw new TRPCError({
+//             code: 'INTERNAL_SERVER_ERROR',
+//             message: 'Failed to update like status',
+//           });
+//         }
+      
+//     }),
+// });
