@@ -4,6 +4,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { AddToListButton } from './AddToListButton';
+import { LikeDislikeButton } from './LikeDislikeButton';
 
 // type MangaDetails = RouterOutputs['manga']['getById'];
 interface MangaDetails {
@@ -14,6 +15,7 @@ interface MangaDetails {
   averageScore: number;
   genres: string[];
   description: string;
+  userLikeStatus: 'like'|'dislike'| null;
 }
 
 interface MangaDetailsViewProps {
@@ -38,7 +40,10 @@ export const MangaDetailsView: React.FC<MangaDetailsViewProps> = ({ manga }) => 
         <div className="md:w-2/3 md:ml-8 mt-4 md:mt-0">
           <h1 className="text-3xl font-bold">{manga.title}</h1>
           <p className="text-gray-600 mt-2">by {manga.author}</p>
-          <p className="text-lg font-semibold mt-2">Score: {manga.averageScore}</p>
+          <div className="mt-4 flex items-center">
+            <LikeDislikeButton mangaId={manga.id} initialLikeStatus={manga.userLikeStatus} />
+            <span className="ml-4 text-lg font-semibold">Score: {manga.averageScore}</span>
+          </div>
           <div className="mt-4">
             {manga.genres.map((genre: string) => (
               <span

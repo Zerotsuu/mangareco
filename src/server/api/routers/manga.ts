@@ -1,5 +1,7 @@
+import { Prisma } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "~/server/api/trpc";
 import { getPopularManga, getMangaById, type AnilistManga } from "~/utils/anilist-api";
 
 interface MangaPreview {
@@ -13,6 +15,7 @@ interface MangaPreview {
 
 interface MangaDetail extends MangaPreview {
   author: string;
+  userLikeStatus: "like" | "dislike" | null
 }
 
 interface PaginatedMangaResponse {
@@ -44,12 +47,31 @@ export const mangaRouter = createTRPCRouter({
         pageInfo: result.pageInfo,
       };
     }),
-      
 
-  getById: publicProcedure
+    getById: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }): Promise<MangaDetail> => {
+    .query(async ({ ctx, input }): Promise<MangaDetail> => {
       const manga = await getMangaById(input.id);
+      const clerkId = ctx.auth.userId;
+
+      let userLikeStatus: 'like' | 'dislike' | null = null;
+
+      if (clerkId) {
+        const user = await ctx.db.user.findUnique({ where: { clerkId } });
+        if (user) {
+          const mangaListItem = await ctx.db.mangaList.findUnique({
+            where: {
+              userId_mangaId: {
+                userId: user.id,
+                mangaId: input.id,
+              },
+            },
+            select: { likeStatus: true },
+          });
+          userLikeStatus = mangaListItem?.likeStatus as 'like' | 'dislike' | null;
+        }
+      }
+
       return {
         id: manga.id,
         title: manga.title.english ?? manga.title.romaji,
@@ -58,9 +80,9 @@ export const mangaRouter = createTRPCRouter({
         genres: manga.genres,
         averageScore: manga.averageScore,
         author: manga.staff?.edges.find((edge) => edge.role === "Story & Art")?.node.name.full ?? "Unknown",
+        userLikeStatus,
       };
     }),
-    
     getByIds: publicProcedure
     .input(z.object({ ids: z.array(z.number()) }))
     .query(async ({ input }): Promise<MangaDetail[]> => {
@@ -74,10 +96,13 @@ export const mangaRouter = createTRPCRouter({
           genres: manga.genres,
           averageScore: manga.averageScore,
           author: manga.staff?.edges.find((edge) => edge.role === "Story & Art")?.node.name.full ?? "Unknown",
+          userLikeStatus: null,
         };
       });
       return Promise.all(mangaPromises);
     }),
-});
+    
+    
+  });
 
 export type { MangaPreview, MangaDetail, PaginatedMangaResponse };

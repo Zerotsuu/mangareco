@@ -9,7 +9,7 @@
 - [x] Image details
 - [x] Grab images from AniList
 - [x] Use Pagination for popular manga
-- [x] Use Infinite scroll pagination
+- [ ] Use Infinite scroll pagination
 - [ ] Setup page routing
 - [x] Setup Database vercel Postgres
 - [x] Add clerk

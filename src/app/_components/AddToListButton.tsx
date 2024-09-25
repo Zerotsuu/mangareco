@@ -9,7 +9,6 @@ interface AddToListButtonProps {
 
 export const AddToListButton: React.FC<AddToListButtonProps> = ({ mangaId }) => {
   const [status, setStatus] = useState('Plan to Read');
-  const [rating, setRating] = useState<number | undefined>(undefined);
 
   const addToListMutation = api.mangaList.addToList.useMutation();
 
@@ -18,7 +17,6 @@ export const AddToListButton: React.FC<AddToListButtonProps> = ({ mangaId }) => 
       await addToListMutation.mutateAsync({
         mangaId,
         status,
-        rating,
       });
       alert('Manga added to your list!');
     } catch (error) {
@@ -34,15 +32,6 @@ export const AddToListButton: React.FC<AddToListButtonProps> = ({ mangaId }) => 
         <option value="Reading">Reading</option>
         <option value="Completed">Completed</option>
       </select>
-      <input
-        type="number"
-        min="0"
-        max="10"
-        step="0.5"
-        value={rating ?? ''}
-        onChange={(e) => setRating(parseFloat(e.target.value))}
-        placeholder="Rating (0-10)"
-      />
       <button onClick={handleAddToList}>Add to List</button>
     </div>
   );
