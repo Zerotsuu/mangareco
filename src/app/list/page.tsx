@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '~/utils/api';
 import Image from 'next/image';
+import Link from 'next/link';
 
 interface MangaDetails {
   id: number;
@@ -43,21 +44,21 @@ const UserListPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {userList?.map((item) => {
           const manga = mangaDetails.find(m => m.id === item.mangaId);
-          return (
-            <div key={item.id} className="border rounded-lg p-4 shadow-md">
-              {manga && (
-                <Image 
-                  src={manga.coverImage} 
-                  alt={manga.title} 
-                  width={200} 
-                  height={300} 
-                  className="w-full h-96 object-cover mb-2 rounded"
-                />
-              )}
-              <h2 className="text-xl font-semibold mb-2">{manga?.title ?? `Manga ${item.mangaId}`}</h2>
-              <p className="text-gray-600">Status: {item.status}</p>
-              {item.rating && <p className="text-gray-600">Rating: {item.rating}</p>}
-            </div>
+          return (  
+            <Link key={item.id} href={`/manga/${item.mangaId}`}>
+              <div className="border rounded-lg p-4 shadow-md text-center">
+                {manga && (
+                  <Image 
+                    src={manga.coverImage} 
+                    alt={manga.title} 
+                    width={200} 
+                    height={300} 
+                    className="w-full h-96 object-cover mb-2 rounded"
+                  />
+                )}
+                <h2 className="text-xl font-semibold mb-2">{manga?.title ?? `Manga ${item.mangaId}`}</h2>
+              </div>
+            </Link>
           );
         })}
       </div>

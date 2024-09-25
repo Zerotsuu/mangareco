@@ -5,6 +5,7 @@ import React from 'react';
 import Image from 'next/image';
 import { AddToListButton } from './AddToListButton';
 import { LikeDislikeButton } from './LikeDislikeButton';
+import { RemoveFromListButton } from './RemoveFromListButton';
 
 // type MangaDetails = RouterOutputs['manga']['getById'];
 interface MangaDetails {
@@ -16,6 +17,7 @@ interface MangaDetails {
   genres: string[];
   description: string;
   userLikeStatus: 'like'|'dislike'| null;
+  isInUserList: boolean;
 }
 
 interface MangaDetailsViewProps {
@@ -42,6 +44,11 @@ export const MangaDetailsView: React.FC<MangaDetailsViewProps> = ({ manga }) => 
           <p className="text-gray-600 mt-2">by {manga.author}</p>
           <div className="mt-4 flex items-center">
             <LikeDislikeButton mangaId={manga.id} initialLikeStatus={manga.userLikeStatus} />
+            {manga.isInUserList ? (
+              <RemoveFromListButton mangaId={manga.id} />
+            ) : (
+              <AddToListButton mangaId={manga.id} />
+            )}
             <span className="ml-4 text-lg font-semibold">Score: {manga.averageScore}</span>
           </div>
           <div className="mt-4">
@@ -56,9 +63,6 @@ export const MangaDetailsView: React.FC<MangaDetailsViewProps> = ({ manga }) => 
           </div>
           <p className="mt-4">{manga.description}</p>
         </div>
-      </div>
-      <div className='mt-4'>
-        <AddToListButton mangaId={manga.id} />
       </div>
     </div>
   );

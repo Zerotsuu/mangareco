@@ -24,13 +24,13 @@ export const MangaGrid: React.FC<MangaGridProps> = ({ initialPage = 1, perPage =
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {data?.manga.map((item: MangaPreview) => (
           <Link href={`/manga/${item.id}`} key={item.id} className="block">
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="bg-white rounded-lg shadow-md p-4 overflow-hidden">
               <Image
                 src={item.coverImage}
                 alt={item.title}
                 width={200}
                 height={300}
-                className="w-full lg:h-96 md:h-64 object-cover mb-2 rounded"
+                className="w-full h-96 object-cover mb-2 rounded"
               />
               <div className="p-2">
                 <h3 className="text-sm font-medium truncate">{item.title}</h3>

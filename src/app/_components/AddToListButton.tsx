@@ -32,7 +32,10 @@ export const AddToListButton: React.FC<AddToListButtonProps> = ({ mangaId }) => 
         <option value="Reading">Reading</option>
         <option value="Completed">Completed</option>
       </select>
-      <button onClick={handleAddToList}>Add to List</button>
+      <button onClick={handleAddToList} className="p-2 rounded-full bg-green-500 hover:bg-green-600 text-white"
+      disabled={addToListMutation.isPending}>
+        Add to List
+      </button>
     </div>
   );
 };

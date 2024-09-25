@@ -16,6 +16,7 @@ interface MangaPreview {
 interface MangaDetail extends MangaPreview {
   author: string;
   userLikeStatus: "like" | "dislike" | null
+  isInUserList:boolean;
 }
 
 interface PaginatedMangaResponse {
@@ -55,6 +56,7 @@ export const mangaRouter = createTRPCRouter({
       const clerkId = ctx.auth.userId;
 
       let userLikeStatus: 'like' | 'dislike' | null = null;
+      let isInUserList = false;
 
       if (clerkId) {
         const user = await ctx.db.user.findUnique({ where: { clerkId } });
@@ -69,6 +71,7 @@ export const mangaRouter = createTRPCRouter({
             select: { likeStatus: true },
           });
           userLikeStatus = mangaListItem?.likeStatus as 'like' | 'dislike' | null;
+          isInUserList = !!mangaListItem;
         }
       }
 
@@ -81,8 +84,10 @@ export const mangaRouter = createTRPCRouter({
         averageScore: manga.averageScore,
         author: manga.staff?.edges.find((edge) => edge.role === "Story & Art")?.node.name.full ?? "Unknown",
         userLikeStatus,
+        isInUserList,
       };
     }),
+
     getByIds: publicProcedure
     .input(z.object({ ids: z.array(z.number()) }))
     .query(async ({ input }): Promise<MangaDetail[]> => {
@@ -97,6 +102,7 @@ export const mangaRouter = createTRPCRouter({
           averageScore: manga.averageScore,
           author: manga.staff?.edges.find((edge) => edge.role === "Story & Art")?.node.name.full ?? "Unknown",
           userLikeStatus: null,
+          isInUserList: false,
         };
       });
       return Promise.all(mangaPromises);
