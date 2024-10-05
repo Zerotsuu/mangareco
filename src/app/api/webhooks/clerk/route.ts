@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     'svix-signature': headerPayload.get('svix-signature')!,
   }
 
-  const payload: unknown = await req.json()
+  const payload:unknown = await req.json()
   const wh = new Webhook(webhookSecret)
 
   let evt: WebhookEvent
