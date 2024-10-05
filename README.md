@@ -16,7 +16,7 @@
 - [ ] Add UserProfiling
 - [x] Connect UserData to db table
 - [x] Add Manga to list db functionality
-- [ ] Full CRUD functionality for manga list
+- [x] Full CRUD functionality for manga list
 - [ ] Add Search Functionality
 - [ ] Add Advanced Search Functionality
 - [ ] Update image components

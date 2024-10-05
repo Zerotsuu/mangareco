@@ -1,7 +1,7 @@
 // app/_components/Navbar.tsx
 import React from 'react';
 import Link from 'next/link';
-import { SignedIn, SignedOut, SignInButton, SignOutButton, UserButton } from '@clerk/nextjs';
+import { SignedIn, SignedOut, SignInButton, SignOutButton, SignUp, SignUpButton, UserButton } from '@clerk/nextjs';
 
 export const Navbar: React.FC = () => {
   return (
@@ -31,6 +31,7 @@ export const Navbar: React.FC = () => {
           <Link href="/login" className="text-white">
             Profile
           </Link>
+          
           <div>
             <SignedOut><SignInButton /></SignedOut>
             <SignedIn><UserButton /></SignedIn>
