@@ -52,6 +52,7 @@ export interface PaginatedMangaResult {
   };
 }
 
+//Query top 100 manga on Anilist api
 export const getPopularManga = async (page: number, perPage: number): Promise<PaginatedMangaResult> => {
   const query = `
     query ($page: Int, $perPage: Int) {
@@ -92,6 +93,7 @@ interface GetMangaByIdResponse {
   Media: AnilistManga;
 }
 
+//Get Manga By ID for mangaList
 export const getMangaById = async (id: number): Promise<AnilistManga> => {
   const query = `
     query ($id: Int) {
@@ -139,6 +141,7 @@ export interface SearchMangaResponse {
   };
 }
 
+//Search manga by String query
 export const searchManga = async (
   query: string,
   page: number,
