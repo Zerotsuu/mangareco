@@ -2,7 +2,7 @@
 import { mangaRouter } from "~/server/api/routers/manga"; 
 import { mangaListRouter } from "~/server/api/routers/mangaList";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
-import { userRouter } from "~/server/api/routers/user";
+import { userProfileRouter } from "~/server/api/routers/userProfile";
 // import { getLayoutOrPageModule } from "next/dist/server/lib/app-dir-module";
 
 /**
@@ -13,7 +13,7 @@ import { userRouter } from "~/server/api/routers/user";
 export const appRouter = createTRPCRouter({
   manga: mangaRouter,
   mangaList: mangaListRouter,
-  user: userRouter,
+  userProfile: userProfileRouter,
 });
 
 // export type definition of API

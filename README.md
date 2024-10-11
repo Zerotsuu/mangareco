@@ -13,7 +13,7 @@
 - [ ] Setup page routing
 - [x] Setup Database vercel Postgres
 - [x] Add clerk
-- [ ] Add UserProfiling
+- [x] Add UserProfiling
 - [x] Connect UserData to db table
 - [x] Add Manga to list db functionality
 - [x] Full CRUD functionality for manga list

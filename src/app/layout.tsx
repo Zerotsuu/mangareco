@@ -1,10 +1,13 @@
 import "~/styles/globals.css";
-import { ClerkProvider } from '@clerk/nextjs'
+import { ClerkProvider, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 import { type Metadata } from "next";
 import { Navbar } from "~/app/_components/Navbar";
 import { Inter } from "next/font/google";
 import { TRPCReactProvider } from "~/trpc/react";
-import { OnboardingCheck } from "~/app/_components/OnboardingCheck"; // Add this import
+import { redirect } from 'next/navigation';
+import { api } from "~/trpc/server";
+import React from "react";
+import { ProfileModal } from "./_components/ProfileModal";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -17,20 +20,22 @@ export const metadata: Metadata = {
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
-const clerkPubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <ClerkProvider publishableKey={clerkPubKey}>
+    <ClerkProvider>
       <html lang="en">
         <body className={`font-sans ${inter.variable}`}>
           <TRPCReactProvider>
-            <OnboardingCheck> {/* Add this wrapper */}
-              <Navbar />
-              <main>{children}</main>
-            </OnboardingCheck>
+            <Navbar />
+            <main>
+              <SignedIn>
+                <ProfileModal/>
+                {children}
+              </SignedIn>
+              <SignedOut>{children}</SignedOut>
+            </main>
           </TRPCReactProvider>
         </body>
       </html>
