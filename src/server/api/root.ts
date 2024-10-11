@@ -3,6 +3,7 @@ import { mangaRouter } from "~/server/api/routers/manga";
 import { mangaListRouter } from "~/server/api/routers/mangaList";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 import { userProfileRouter } from "~/server/api/routers/userProfile";
+import { recommendationRouter } from "~/server/api/routers/recommendation";
 // import { getLayoutOrPageModule } from "next/dist/server/lib/app-dir-module";
 
 /**
@@ -14,6 +15,7 @@ export const appRouter = createTRPCRouter({
   manga: mangaRouter,
   mangaList: mangaListRouter,
   userProfile: userProfileRouter,
+  recommendation: recommendationRouter,
 });
 
 // export type definition of API

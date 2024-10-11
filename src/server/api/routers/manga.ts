@@ -1,8 +1,7 @@
-import { Prisma } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "~/server/api/trpc";
-import { getPopularManga, getMangaById, type AnilistManga } from "~/utils/anilist-api";
+import { getPopularManga, getMangaById, type AnilistManga, searchManga } from "~/utils/anilist-api";
+import { db } from "~/server/db";
 
 interface MangaPreview {
   id: number;
@@ -107,8 +106,16 @@ export const mangaRouter = createTRPCRouter({
       });
       return Promise.all(mangaPromises);
     }),
-    
-    
+    search: publicProcedure
+    .input(z.object({
+      query: z.string(),
+      page: z.number().int().positive(),
+      perPage: z.number().int().positive().max(50)
+    }))
+    .query(async ({ input }) => {
+      const { query, page, perPage } = input;
+      return await searchManga(query, page, perPage);
+    }),
   });
 
 export type { MangaPreview, MangaDetail, PaginatedMangaResponse };

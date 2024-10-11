@@ -2,6 +2,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { SignedIn, SignedOut, SignInButton, SignOutButton, SignUp, SignUpButton, UserButton } from '@clerk/nextjs';
+import { SearchBar } from './SearchBar';
 
 export const Navbar: React.FC = () => {
   return (
@@ -11,11 +12,7 @@ export const Navbar: React.FC = () => {
           MangaRec
         </Link>
         <div className="flex space-x-4">
-          <input
-            type="text"
-            placeholder="Search manga..."
-            className="px-2 py-1 rounded"
-          />
+          <SearchBar />
           <Link href="/" className="text-white">
             Popular
           </Link>
