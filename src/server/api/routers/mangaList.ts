@@ -85,15 +85,15 @@ export const mangaListRouter = createTRPCRouter({
 
       return {
         mangaList: user.mangaList,
-        userProfile: {
-          id: user.id,
-          updatedAt: user.updatedAt,
-          clerkId: user.clerkId,
-          email: user.email,
-          createdAt: user.createdAt,
-          // experience: user.experience,
-          favoriteGenres: user.favoriteGenres,
-        },
+        // userProfile: {
+        //   id: user.id,
+        //   updatedAt: user.updatedAt,
+        //   clerkId: user.clerkId,
+        //   email: user.email,
+        //   createdAt: user.createdAt,
+        //   experience: user.experience,
+        //   favoriteGenres: user.favoriteGenres,
+        // },
       };
     } catch (error) {
       console.error("Error getting user list:", error);
