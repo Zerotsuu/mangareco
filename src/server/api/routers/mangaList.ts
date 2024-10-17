@@ -9,50 +9,138 @@ export const mangaListRouter = createTRPCRouter({
       z.object({
         mangaId: z.number(),
         status: z.string(),
-        rating: z.number().min(0).max(10).optional(),
+        likeStatus: z.enum(["like", "dislike"]).nullable(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const clerkId = ctx.auth.userId;
-      if (clerkId === null) {
-        throw new Error("User not authenticated");
+      if (!clerkId) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "User not authenticated" });
       }
-      // Check if the user exists
-      let user = await ctx.db.user.findUnique({
-        where: { clerkId },
-      });
 
-      // If the user doesn't exist, create a new user
-      if (!user) {
-        user = await ctx.db.user.create({
-          data: { clerkId },
+      try {
+        const result = await ctx.db.$transaction(async (prisma) => {
+          // First, ensure the User exists
+          let user = await prisma.user.findUnique({ where: { clerkId } });
+          if (!user) {
+            user = await prisma.user.create({ data: { clerkId } });
+          }
+
+          // Then, ensure the UserProfile exists
+          let userProfile = await prisma.userProfile.findUnique({ where: { userId: user.id } });
+          if (!userProfile) {
+            userProfile = await prisma.userProfile.create({
+              data: {
+                userId: user.id,
+                favoriteGenres: [],
+                experience: "", // Initialize with an empty array
+              },
+            });
+          }
+
+          // Finally, upsert the MangaList item
+          return prisma.mangaList.upsert({
+            where: {
+              userId_mangaId: {
+                userId: user.id,
+                mangaId: input.mangaId,
+              },
+            },
+            update: {
+              status: input.status,
+              likeStatus: input.likeStatus,
+            },
+            create: {
+              userId: user.id,
+              mangaId: input.mangaId,
+              status: input.status,
+              likeStatus: input.likeStatus,
+            },
+          });
         });
+
+        return result;
+      } catch (error) {
+        console.error("Error adding to list:", error);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to add to list" });
       }
-      return ctx.db.mangaList.create({
-        data: {
-          userId: user.id,
-          mangaId: input.mangaId,
-          status: input.status,
-        },
-      });
     }),
 
   getUserList: protectedProcedure.query(async ({ ctx }) => {
     const clerkId = ctx.auth.userId;
-    if (clerkId === null) {
-      throw new Error("User not authenticated");
+    if (!clerkId) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: "User not authenticated" });
     }
-    const user = await ctx.db.user.findUnique({
-      where: { clerkId },
-    });
-    if (!user) {
-      throw new Error("User not found");
+
+    try {
+      const user = await ctx.db.user.findUnique({
+        where: { clerkId },
+        include: {
+          mangaList: true, // Removed { include: { manga: true } }
+        },
+      });
+      if (!user) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+      }
+
+      return {
+        mangaList: user.mangaList,
+        userProfile: {
+          id: user.id,
+          updatedAt: user.updatedAt,
+          clerkId: user.clerkId,
+          email: user.email,
+          createdAt: user.createdAt,
+          experience: user.experience,
+          favoriteGenres: user.favoriteGenres,
+        },
+      };
+    } catch (error) {
+      console.error("Error getting user list:", error);
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get user list" });
     }
-    return ctx.db.mangaList.findMany({
-      where: { userId: user.id },
-      include: { user: true },
-    });
   }),
+
+  updateUserProfile: protectedProcedure
+    .input(
+      z.object({
+        experience: z.string().optional(),
+        favoriteGenres: z.array(z.string()).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const clerkId = ctx.auth.userId;
+      if (!clerkId) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "User not authenticated" });
+      }
+
+      try {
+        const result = await ctx.db.$transaction(async (prisma) => {
+          let user = await prisma.user.findUnique({ where: { clerkId } });
+          if (!user) {
+            user = await prisma.user.create({ data: { clerkId } });
+          }
+
+          return prisma.userProfile.upsert({
+            where: { userId: user.id },
+            update: {
+              ...(input.experience && { experience: input.experience ?? '' }),
+              ...(input.favoriteGenres && { favoriteGenres: input.favoriteGenres }),
+            },
+            create: {
+              userId: user.id,
+              experience: input.experience ?? '',
+              favoriteGenres: input.favoriteGenres ?? [],
+            },
+          });
+        });
+
+        return result;
+      } catch (error) {
+        console.error("Error updating user profile:", error);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update user profile" });
+      }
+    }),
 
   updateLikeStatus: protectedProcedure
     .input(
@@ -62,54 +150,51 @@ export const mangaListRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const userId = ctx.auth.userId!;
+      const clerkId = ctx.auth.userId;
+      if (!clerkId) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "User not authenticated" });
+      }
+
       try {
-        // Find User
-        let user = await ctx.db.user.findUnique({ where: { id: userId } });
-
-        // Check if user exists, create if not
-        if (!user) {
-          user = await ctx.db.user.create({
-            data: { id: userId, clerkId: userId },
+        const result = await ctx.db.$transaction(async (prisma) => {
+          // Use upsert to create or update the user
+          const user = await prisma.user.upsert({
+            where: { clerkId },
+            update: {}, // No updates needed if the user exists
+            create: { clerkId },
           });
-        }
-
-        let mangaListItem = await ctx.db.mangaList.findFirst({
-          where: {
-            userId: user.id,
-            mangaId: input.mangaId,
-          },
-        });
-        if (mangaListItem) {
-          //Update existing entry
-          mangaListItem = await ctx.db.mangaList.update({
-            where: { id: mangaListItem.id },
-            data: {
-              likeStatus: input.likeStatus,
+          // Ensure UserProfile exists
+          await prisma.userProfile.upsert({
+            where: { userId: user.id },
+            update: {},
+            create: {
+              userId: user.id,
+              favoriteGenres: [], // Initialize with an empty array
+              experience: "", // Provide a default value for the required 'experience' field
             },
           });
-        } else {
-          //Create new entry
-          mangaListItem = await ctx.db.mangaList.create({
-            data: {
+          // Update or create the MangaList item
+          return prisma.mangaList.upsert({
+            where: {
+              userId_mangaId: {
+                userId: user.id,
+                mangaId: input.mangaId,
+              },
+            },
+            update: { likeStatus: input.likeStatus },
+            create: {
               userId: user.id,
               mangaId: input.mangaId,
               likeStatus: input.likeStatus,
               status: "Plan to Read", // Default status
             },
           });
-        }
-        return mangaListItem;
+        });
+
+        return result;
       } catch (error) {
         console.error("Error updating like status:", error);
-        if (error instanceof Prisma.PrismaClientKnownRequestError) {
-          console.error("Prisma error code:", error.code);
-          console.error("Prisma error message:", error.message);
-        }
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to update like status",
-        });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update like status" });
       }
     }),
 
@@ -161,6 +246,7 @@ export const mangaListRouter = createTRPCRouter({
         });
       }
     }),
+
 });
 
 // Update like status

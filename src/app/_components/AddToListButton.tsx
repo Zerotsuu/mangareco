@@ -17,6 +17,7 @@ export const AddToListButton: React.FC<AddToListButtonProps> = ({ mangaId }) => 
       await addToListMutation.mutateAsync({
         mangaId,
         status,
+        likeStatus:null,
       });
       alert('Manga added to your list!');
     } catch (error) {

@@ -23,16 +23,13 @@ model User {
     createdAt     DateTime   @default(now())
     updatedAt     DateTime   @updatedAt
     mangaList     MangaList[]
-    experience String?
-    favoriteGenres String[]
 }
 
 model UserProfile {
   id        String   @id @default(cuid())
   userId    String   @unique
-  experience String  // e.g., "new", "intermediate", "experienced"
+  experience String?  // e.g., "new", "intermediate", "experienced"
   favoriteGenres String[]
-  mangaList String[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
