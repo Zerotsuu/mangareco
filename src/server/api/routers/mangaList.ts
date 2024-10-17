@@ -91,7 +91,7 @@ export const mangaListRouter = createTRPCRouter({
           clerkId: user.clerkId,
           email: user.email,
           createdAt: user.createdAt,
-          experience: user.experience,
+          // experience: user.experience,
           favoriteGenres: user.favoriteGenres,
         },
       };
