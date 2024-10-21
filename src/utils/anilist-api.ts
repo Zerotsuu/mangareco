@@ -64,7 +64,7 @@ export const getPopularManga = async (page: number, perPage: number): Promise<Pa
           hasNextPage
           perPage
         }
-        media(type: MANGA, sort: POPULARITY_DESC) {
+        media(type: MANGA, sort: POPULARITY_DESC, isAdult: false) {
           id
           title {
             romaji
@@ -157,7 +157,7 @@ export const searchManga = async (
           hasNextPage
           perPage
         }
-        media(type: MANGA, search: $search) {
+        media(type: MANGA, search: $search, isAdult: false) {
           id
           title {
             romaji
