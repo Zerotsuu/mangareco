@@ -15,9 +15,9 @@ export const ProfileModal: React.FC = () => {
     if (user && !isLoading && !profile && user.createdAt) {
       const creationTime = new Date(user.createdAt);
       const now = new Date();
-      const hoursSinceCreation = (now.getTime() - creationTime.getTime()) / (1000 * 60 * 60);
+      const hoursSinceCreation = (now.getTime() - creationTime.getTime()) / (1000);
 
-      if (hoursSinceCreation < 5) {
+      if (hoursSinceCreation < 20) {
         setIsOpen(true);
       }
     }
