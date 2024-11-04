@@ -7,11 +7,11 @@ import { SearchBar } from './SearchBar';
 export const Navbar: React.FC = () => {
   return (
     <nav className="bg-gray-800 p-4">
-      <div className="container mx-auto flex justify-between items-center">
+      <div className="container mx-auto flex justify-between items-center align-middle">
         <Link href="/" className="text-white text-xl font-bold">
           MangaRec
         </Link>
-        <div className="flex space-x-4">
+        <div className="flex space-x-4 items-center">
           <SearchBar />
           <Link href="/" className="text-white">
             Popular
@@ -30,7 +30,7 @@ export const Navbar: React.FC = () => {
           </Link>
           
           <div>
-            <SignedOut><SignInButton /></SignedOut>
+            <SignedOut><div className='text-white border rounded-md p-1'><SignInButton mode="modal" /></div></SignedOut>
             <SignedIn><UserButton /></SignedIn>
           </div>
         </div>
