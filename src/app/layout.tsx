@@ -1,11 +1,9 @@
 import "~/styles/globals.css";
-import { ClerkProvider, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
+import { ClerkProvider, SignedIn, SignedOut} from '@clerk/nextjs'
 import { type Metadata } from "next";
 import { Navbar } from "~/app/_components/Navbar";
 import { Inter } from "next/font/google";
 import { TRPCReactProvider } from "~/trpc/react";
-import { redirect } from 'next/navigation';
-import { api } from "~/trpc/server";
 import React from "react";
 import { ProfileModal } from "./_components/ProfileModal";
 

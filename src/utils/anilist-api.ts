@@ -2,9 +2,43 @@ import { GraphQLClient } from 'graphql-request';
 
 const ANILIST_API_ENDPOINT = 'https://graphql.anilist.co';
 
-export const anilistClient = new GraphQLClient(ANILIST_API_ENDPOINT);
+// Cache types
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+// Queue operation type
+interface QueueOperation<T> {
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: Error) => void;
+  operation: () => Promise<T>;
+}
+
+// Rate limiting configuration
+interface RateLimit {
+  requests: number;
+  windowMs: number;
+  queue: QueueOperation<unknown>[];
+  count: number;
+  lastReset: number;
+}
+
+// Initialize cache with proper typing
+const cache = new Map<string, CacheEntry<PaginatedResponse | GetMangaByIdResponse>>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Rate limiting setup with proper typing
+const RATE_LIMIT: RateLimit = {
+  requests: 85,
+  windowMs: 60 * 1000,
+  queue: [],
+  count: 0,
+  lastReset: Date.now()
+};
 
 export interface AnilistManga {
+  popularity: number;
   id: number;
   title: {
     romaji: string;
@@ -28,31 +62,134 @@ export interface AnilistManga {
   };
 }
 
+interface PageInfo {
+  total: number;
+  currentPage: number;
+  lastPage: number;
+  hasNextPage: boolean;
+  perPage: number;
+}
+
 interface PaginatedResponse {
   Page: {
-    pageInfo: {
-      total: number;
-      currentPage: number;
-      lastPage: number;
-      hasNextPage: boolean;
-      perPage: number;
-    };
+    pageInfo: PageInfo;
     media: AnilistManga[];
   };
 }
 
 export interface PaginatedMangaResult {
   manga: AnilistManga[];
-  pageInfo: {
-    total: number;
-    currentPage: number;
-    lastPage: number;
-    hasNextPage: boolean;
-    perPage: number;
+  pageInfo: PageInfo;
+}
+
+interface GetMangaByIdResponse {
+  Media: AnilistManga;
+}
+
+interface GraphQLErrorResponse extends Error {
+  response?: {
+    status: number;
+    headers: Headers;
   };
 }
 
-//Query top 100 manga on Anilist api
+// Query variables types
+interface PageVariables {
+  page: number;
+  perPage: number;
+}
+
+interface SearchVariables extends PageVariables {
+  search: string;
+}
+
+interface IdVariable {
+  id: number;
+}
+
+// Create rate-limited GraphQL client
+class RateLimitedGraphQLClient {
+  private client: GraphQLClient;
+
+  constructor(endpoint: string) {
+    this.client = new GraphQLClient(endpoint);
+  }
+
+  private async executeWithRateLimit<T>(operation: () => Promise<T>): Promise<T> {
+    if (Date.now() - RATE_LIMIT.lastReset >= RATE_LIMIT.windowMs) {
+      RATE_LIMIT.count = 0;
+      RATE_LIMIT.lastReset = Date.now();
+    }
+
+    if (RATE_LIMIT.count < RATE_LIMIT.requests) {
+      RATE_LIMIT.count++;
+      return operation();
+    }
+
+    return new Promise<T>((resolve, reject) => {
+      RATE_LIMIT.queue.push({ 
+        resolve: resolve as (value: unknown) => void, 
+        reject, 
+        operation 
+      });
+      
+      setTimeout(() => {
+        this.processQueue();
+      }, RATE_LIMIT.windowMs - (Date.now() - RATE_LIMIT.lastReset));
+    });
+  }
+
+  private processQueue(): void {
+    RATE_LIMIT.count = 0;
+    RATE_LIMIT.lastReset = Date.now();
+
+    while (RATE_LIMIT.queue.length > 0 && RATE_LIMIT.count < RATE_LIMIT.requests) {
+      const next = RATE_LIMIT.queue.shift();
+      if (next) {
+        RATE_LIMIT.count++;
+        next.operation()
+          .then(next.resolve)
+          .catch(next.reject);
+      }
+    }
+  }
+
+  async request<T extends PaginatedResponse | GetMangaByIdResponse>(
+    query: string, 
+    variables: PageVariables | SearchVariables | IdVariable,
+    cacheKey?: string
+  ): Promise<T> {
+    if (cacheKey) {
+      const cached = cache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        return cached.data as T;
+      }
+    }
+
+    try {
+      const data = await this.executeWithRateLimit(() =>
+        this.client.request<T>(query, variables)
+      );
+
+      if (cacheKey) {
+        cache.set(cacheKey, { data, timestamp: Date.now() });
+      }
+
+      return data;
+    } catch (error) {
+      const graphQLError = error as GraphQLErrorResponse;
+      if (graphQLError.response?.status === 429) {
+        const retryAfter = parseInt(graphQLError.response.headers.get('retry-after') ?? '30');
+        await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+        return this.request<T>(query, variables, cacheKey);
+      }
+      throw error;
+    }
+  }
+}
+
+export const anilistClient = new RateLimitedGraphQLClient(ANILIST_API_ENDPOINT);
+
 export const getPopularManga = async (page: number, perPage: number): Promise<PaginatedMangaResult> => {
   const query = `
     query ($page: Int, $perPage: Int) {
@@ -81,19 +218,21 @@ export const getPopularManga = async (page: number, perPage: number): Promise<Pa
     }
   `;
 
-  const variables = { page, perPage };
-  const data = await anilistClient.request<PaginatedResponse>(query, variables);
+  const variables: PageVariables = { page, perPage };
+  const cacheKey = `popular-${page}-${perPage}`;
+  
+  const data = await anilistClient.request<PaginatedResponse>(
+    query, 
+    variables,
+    cacheKey
+  );
+  
   return {
     manga: data.Page.media,
     pageInfo: data.Page.pageInfo
   };
 };
 
-interface GetMangaByIdResponse {
-  Media: AnilistManga;
-}
-
-//Get Manga By ID for mangaList
 export const getMangaById = async (id: number): Promise<AnilistManga> => {
   const query = `
     query ($id: Int) {
@@ -123,31 +262,24 @@ export const getMangaById = async (id: number): Promise<AnilistManga> => {
     }
   `;
 
-  const variables = { id };
-  const data = await anilistClient.request<GetMangaByIdResponse>(query, variables);
+  const variables: IdVariable = { id };
+  const cacheKey = `manga-${id}`;
+  
+  const data = await anilistClient.request<GetMangaByIdResponse>(
+    query, 
+    variables,
+    cacheKey
+  );
+  
   return data.Media;
 };
 
-export interface SearchMangaResponse {
-  Page: {
-    pageInfo: {
-      total: number;
-      currentPage: number;
-      lastPage: number;
-      hasNextPage: boolean;
-      perPage: number;
-    };
-    media: AnilistManga[];
-  };
-}
-
-//Search manga by String query
 export const searchManga = async (
-  query: string,
+  searchQuery: string,
   page: number,
   perPage: number
 ): Promise<PaginatedMangaResult> => {
-  const searchQuery = `
+  const query = `
     query ($search: String, $page: Int, $perPage: Int) {
       Page(page: $page, perPage: $perPage) {
         pageInfo {
@@ -174,8 +306,9 @@ export const searchManga = async (
     }
   `;
 
-  const variables = { search: query, page, perPage };
-  const data = await anilistClient.request<SearchMangaResponse>(searchQuery, variables);
+  const variables: SearchVariables = { search: searchQuery, page, perPage };
+  
+  const data = await anilistClient.request<PaginatedResponse>(query, variables);
   return {
     manga: data.Page.media,
     pageInfo: data.Page.pageInfo
