@@ -5,7 +5,7 @@ import { TRPCError } from "@trpc/server";
 import fs from 'fs';
 import path from 'path';
 import { getMangaById } from "~/utils/anilist-api";
-import type { MangaRecommendation } from "~/server/services/recommendations/types";
+import type { MangaRecommendation, RecommenderConfig } from "~/server/services/recommendations/types";
 import { DEFAULT_CONFIG } from "~/server/services/recommendations/types";
 
 // Initialize recommender with CSV data
@@ -83,11 +83,18 @@ export const recommendationRouter = createTRPCRouter({
         // Debug user profile
         console.log('User profile features:');
         // recommender.printUserProfile(userList);
+        // When getting recommendations
+        const userSettings = user.UserProfile.recommendationSettings 
+        ? (user.UserProfile.recommendationSettings as unknown as RecommenderConfig)
+        : DEFAULT_CONFIG;
+
+        // Update recommender with user's settings
+        recommender.updateConfig(userSettings);
 
         // Get recommendations
         const recommendations = recommender.getRecommendations(
           userList,
-          // user.UserProfile,
+          user.UserProfile,
           input.numRecommendations
         );
 
