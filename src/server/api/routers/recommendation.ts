@@ -6,10 +6,10 @@ import { performance } from 'perf_hooks';
 import path from 'path';
 import { promises as fs } from 'fs';
 import { getMangaById } from "~/utils/anilist-api";
-import type { 
-  MangaRecommendation, 
+import type {
+  MangaRecommendation,
   RecommenderConfig,
-  CacheEntry 
+  CacheEntry
 } from "~/server/services/recommendations/types";
 import { DEFAULT_CONFIG } from "~/server/services/recommendations/types";
 
@@ -19,7 +19,7 @@ class RecommendationCache {
   private history = new Map<string, Set<number>>();
   private readonly CACHE_TTL = 30 * 60 * 1000; // 30 minutes
   private readonly HISTORY_TTL = 24 * 60 * 60 * 1000; // 24 hours
-  
+
   set(userId: string, key: string, data: MangaRecommendation[]): void {
     this.cache.set(`${userId}:${key}`, {
       data,
@@ -60,12 +60,20 @@ class RecommendationCache {
 
 // Initialize recommender with error handling and retries
 let recommender: ContentBasedRecommender | null = null;
+let initializationPromise: Promise<void> | null = null;
 const cache = new RecommendationCache();
 
 const initializeRecommender = async (retries = 3): Promise<void> => {
   try {
-    const csvPath = path.join(process.cwd(), 'src', 'data', 'manga_features.csv');
-    const csvData = await fs.readFile(csvPath, 'utf-8');
+    let csvData: string;
+    try {
+      const csvPath = path.join(process.cwd(), 'src', 'data', 'manga_features.csv');
+      csvData = await fs.readFile(csvPath, 'utf-8');
+    } catch (error) {
+      console.error('Failed to read CSV file:', error);
+      throw error;
+    }
+
     recommender = new ContentBasedRecommender(csvData);
     console.log('Recommender initialized successfully');
   } catch (error) {
@@ -79,8 +87,28 @@ const initializeRecommender = async (retries = 3): Promise<void> => {
   }
 };
 
-// Initialize recommender on startup
-void initializeRecommender();
+// Function to get or initialize recommender
+const getRecommender = async (): Promise<ContentBasedRecommender> => {
+  if (recommender) return recommender;
+
+  if (!initializationPromise) {
+    initializationPromise = initializeRecommender();
+  }
+
+  try {
+    await initializationPromise;
+    if (!recommender) {
+      throw new Error('Recommender failed to initialize');
+    }
+    return recommender;
+  } catch (error) {
+    console.error('Failed to initialize recommender:', error);
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to initialize recommendation system",
+    });
+  }
+};
 
 // Input validation schemas
 const recommendationInputSchema = z.object({
@@ -98,12 +126,11 @@ export const recommendationRouter = createTRPCRouter({
       const start = performance.now();
 
       try {
-        if (!recommender) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Recommendation system is initializing",
-          });
-        }
+        const recommender = await getRecommender();
+        if (!recommender) throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Recommendation system is initializing",
+        });
         if (!ctx.auth.userId) {
           throw new TRPCError({
             code: "NOT_FOUND",
@@ -111,15 +138,13 @@ export const recommendationRouter = createTRPCRouter({
           });
         }
 
-
         // First get the user
         const user = await ctx.db.user.findUnique({
           where: { clerkId: ctx.auth.userId },
-          include: { 
+          include: {
             UserProfile: true,
           },
         });
-
         if (!user) {
           throw new TRPCError({
             code: "NOT_FOUND",
@@ -136,7 +161,7 @@ export const recommendationRouter = createTRPCRouter({
 
         // Get user's manga list
         const userList = await ctx.db.mangaList.findMany({
-          where: { 
+          where: {
             userId: user.id  // Use the user.id, not clerkId
           },
           select: {
@@ -156,7 +181,7 @@ export const recommendationRouter = createTRPCRouter({
 
         const cacheKey = JSON.stringify(input);
         const cachedRecommendations = cache.get(ctx.auth.userId, cacheKey);
-        
+
         if (cachedRecommendations) {
           return {
             items: cachedRecommendations,
@@ -190,27 +215,27 @@ export const recommendationRouter = createTRPCRouter({
         );
 
         // Take only what we need for this page
-      const recommendationsForPage = recommendations.slice(0, input.limit);
-      const hasMore = recommendations.length > input.limit;
+        const recommendationsForPage = recommendations.slice(0, input.limit);
+        const hasMore = recommendations.length > input.limit;
 
         // Fetch manga details in parallel
         const mangaDetails = await Promise.all(
           recommendations.map(async (rec) => {
             try {
               const manga = await getMangaById(rec.id);
-              
+
               // Apply filters
               if (input.minScore && (manga.averageScore ?? 0) < input.minScore) {
                 return null;
               }
-              
-              if (input.genres?.length && 
-                  !input.genres.some(g => manga.genres.includes(g))) {
+
+              if (input.genres?.length &&
+                !input.genres.some(g => manga.genres.includes(g))) {
                 return null;
               }
-              
-              if (input.excludeGenres?.length && 
-                  input.excludeGenres.some(g => manga.genres.includes(g))) {
+
+              if (input.excludeGenres?.length &&
+                input.excludeGenres.some(g => manga.genres.includes(g))) {
                 return null;
               }
 
@@ -232,8 +257,8 @@ export const recommendationRouter = createTRPCRouter({
           })
         );
 
-          // Process results
-          const validMangaDetails = mangaDetails
+        // Process results
+        const validMangaDetails = mangaDetails
           .filter((manga): manga is NonNullable<typeof manga> => manga !== null)
           .sort((a, b) => b.similarity - a.similarity)
           .slice(0, input.limit);
