@@ -38,6 +38,7 @@ const RATE_LIMIT: RateLimit = {
 };
 
 export interface AnilistManga {
+  status: string;
   popularity: number;
   id: number;
   title: {
@@ -201,7 +202,7 @@ export const getPopularManga = async (page: number, perPage: number): Promise<Pa
           hasNextPage
           perPage
         }
-        media(type: MANGA, sort: POPULARITY_DESC, isAdult: false) {
+        media(type: MANGA, sort: POPULARITY_DESC, isAdult: false, countryOfOrigin: JP) {
           id
           title {
             romaji
@@ -246,6 +247,7 @@ export const getMangaById = async (id: number): Promise<AnilistManga> => {
           large
         }
         description
+        status
         genres
         averageScore
         staff {

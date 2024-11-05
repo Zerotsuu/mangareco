@@ -9,7 +9,9 @@ import { ChevronDown, ChevronUp, Settings2 } from 'lucide-react';
 
 export const RecommendationSettings: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [config, setConfig] = useState<RecommenderConfigInput>(DEFAULT_CONFIG);
+  const [config, setConfig] = useState<RecommenderConfigInput>({
+    ...DEFAULT_CONFIG,
+  });
   const [isInitialized, setIsInitialized] = useState(false);
 
   const { data: savedSettings, error: settingsError, isLoading: isLoadingSettings } = 
@@ -24,7 +26,7 @@ export const RecommendationSettings: React.FC = () => {
         setConfig(savedSettings);
       } else if (settingsError) {
         console.error('Error loading settings:', settingsError);
-        setConfig(DEFAULT_CONFIG);
+        setConfig({...DEFAULT_CONFIG});
       }
       setIsInitialized(true);
     }
@@ -45,7 +47,7 @@ export const RecommendationSettings: React.FC = () => {
   };
 
   const handleReset = () => {
-    setConfig(DEFAULT_CONFIG);
+    setConfig({...DEFAULT_CONFIG});
   };
 
   const handleSliderChange = (

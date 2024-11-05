@@ -27,7 +27,6 @@ const recommenderConfigSchema = z.object({
     intermediate: z.number(),
     experienced: z.number(),
   }),
-  maxResults: z.number().min(1).max(50),
 });
 
 export type RecommenderConfigInput = z.infer<typeof recommenderConfigSchema>;

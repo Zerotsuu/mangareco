@@ -2,120 +2,228 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { ContentBasedRecommender } from "~/server/services/recommendations/ContentBasedRecommender";
 import { TRPCError } from "@trpc/server";
-import fs from 'fs';
+import { performance } from 'perf_hooks';
 import path from 'path';
+import { promises as fs } from 'fs';
 import { getMangaById } from "~/utils/anilist-api";
-import type { MangaRecommendation, RecommenderConfig } from "~/server/services/recommendations/types";
+import type { 
+  MangaRecommendation, 
+  RecommenderConfig,
+  CacheEntry 
+} from "~/server/services/recommendations/types";
 import { DEFAULT_CONFIG } from "~/server/services/recommendations/types";
 
-// Initialize recommender with CSV data
-let recommender: ContentBasedRecommender | null = null;
+// Simple in-memory cache implementation
+class RecommendationCache {
+  private cache = new Map<string, CacheEntry<MangaRecommendation[]>>();
+  private history = new Map<string, Set<number>>();
+  private readonly CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+  private readonly HISTORY_TTL = 24 * 60 * 60 * 1000; // 24 hours
+  
+  set(userId: string, key: string, data: MangaRecommendation[]): void {
+    this.cache.set(`${userId}:${key}`, {
+      data,
+      timestamp: Date.now(),
+      expiresAt: Date.now() + this.CACHE_TTL
+    });
+  }
 
-try {
-  const csvPath = path.join(process.cwd(), 'src', 'data', 'manga_features.csv');
-  const csvData = fs.readFileSync(csvPath, 'utf-8');
-  recommender = new ContentBasedRecommender(csvData);
-  console.log('Recommender initialized successfully');
-} catch (error) {
-  console.error('Failed to initialize recommender:', error);
+  get(userId: string, key: string): MangaRecommendation[] | null {
+    const entry = this.cache.get(`${userId}:${key}`);
+    if (!entry || Date.now() > entry.expiresAt) {
+      this.cache.delete(`${userId}:${key}`);
+      return null;
+    }
+    return entry.data;
+  }
+
+  addToHistory(userId: string, mangaIds: number[]): void {
+    const userHistory = this.history.get(userId) ?? new Set();
+    mangaIds.forEach(id => userHistory.add(id));
+    this.history.set(userId, userHistory);
+  }
+
+  getHistory(userId: string): number[] {
+    return Array.from(this.history.get(userId) ?? []);
+  }
+
+  clearHistory(userId: string): void {
+    this.history.delete(userId);
+    // Clear all user's recommendation caches
+    for (const key of this.cache.keys()) {
+      if (key.startsWith(`${userId}:`)) {
+        this.cache.delete(key);
+      }
+    }
+  }
 }
+
+// Initialize recommender with error handling and retries
+let recommender: ContentBasedRecommender | null = null;
+const cache = new RecommendationCache();
+
+const initializeRecommender = async (retries = 3): Promise<void> => {
+  try {
+    const csvPath = path.join(process.cwd(), 'src', 'data', 'manga_features.csv');
+    const csvData = await fs.readFile(csvPath, 'utf-8');
+    recommender = new ContentBasedRecommender(csvData);
+    console.log('Recommender initialized successfully');
+  } catch (error) {
+    if (retries > 0) {
+      console.warn(`Retrying recommender initialization. Attempts left: ${retries - 1}`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return initializeRecommender(retries - 1);
+    }
+    console.error('Failed to initialize recommender:', error);
+    throw error;
+  }
+};
+
+// Initialize recommender on startup
+void initializeRecommender();
+
+// Input validation schemas
+const recommendationInputSchema = z.object({
+  excludeIds: z.array(z.number()).default([]),
+  limit: z.number().min(1).max(20).default(10),
+  minScore: z.number().min(0).max(100).optional(),
+  genres: z.array(z.string()).optional(),
+  excludeGenres: z.array(z.string()).optional(),
+});
 
 export const recommendationRouter = createTRPCRouter({
   getRecommendations: protectedProcedure
-    .input(z.object({
-      numRecommendations: z.number().min(1).max(20).default(10),
-    }))
+    .input(recommendationInputSchema)
     .query(async ({ ctx, input }) => {
-      if (!recommender) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Recommendation system not initialized",
-        });
-      }
-
-      const clerkId = ctx.auth.userId;
-      if (!clerkId) {
-        throw new TRPCError({ code: "UNAUTHORIZED" });
-      }
+      const start = performance.now();
 
       try {
-        // Get user
+        if (!recommender) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Recommendation system is initializing",
+          });
+        }
+        if (!ctx.auth.userId) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "No user ID found",
+          });
+        }
+
+
+        // First get the user
         const user = await ctx.db.user.findUnique({
-          where: { clerkId },
-          include: {
-            UserProfile:true
+          where: { clerkId: ctx.auth.userId },
+          include: { 
+            UserProfile: true,
           },
         });
 
-        if (!user?.UserProfile) {
+        if (!user) {
           throw new TRPCError({
             code: "NOT_FOUND",
-            message: "User profile not found",
+            message: "User not found",
+          });
+        }
+
+        if (!user.UserProfile) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Please complete your profile first",
           });
         }
 
         // Get user's manga list
         const userList = await ctx.db.mangaList.findMany({
-          where: { userId: user.id },
+          where: { 
+            userId: user.id  // Use the user.id, not clerkId
+          },
           select: {
             mangaId: true,
             likeStatus: true,
           },
         });
 
-        console.log('User list:', {
-          count: userList.length,
-          items: userList.slice(0, 3), // Log first 3 items
-        });
+        console.log('User list length:', userList.length); // Debug log
 
-        if (userList.length === 0) {
+        if (!userList || userList.length < 5) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Please add some manga to your list first",
+            message: `Please add at least 5 manga to your list for better recommendations (current: ${userList.length})`,
           });
         }
 
-        // Debug some manga from user's list
-        if (userList.length > 0 && userList[0]) {
-          console.log('Debugging first manga in list:');
-          // recommender.printMangaFeatures(userList[0].mangaId);
+        const cacheKey = JSON.stringify(input);
+        const cachedRecommendations = cache.get(ctx.auth.userId, cacheKey);
+        
+        if (cachedRecommendations) {
+          return {
+            items: cachedRecommendations,
+            hasMore: true,
+            timing: performance.now() - start,
+            source: 'cache',
+          };
+        }
 
-        // Debug user profile
-        console.log('User profile features:');
-        // recommender.printUserProfile(userList);
-        // When getting recommendations
-        const userSettings = user.UserProfile.recommendationSettings 
-        ? (user.UserProfile.recommendationSettings as unknown as RecommenderConfig)
-        : DEFAULT_CONFIG;
+        // Combine exclude IDs with history
+        const recommendationHistory = cache.getHistory(ctx.auth.userId);
+        const allExcludedIds = new Set([
+          ...input.excludeIds,
+          ...recommendationHistory,
+          ...userList.map(item => item.mangaId),
+        ]);
 
-        // Update recommender with user's settings
-        recommender.updateConfig(userSettings);
+        // Use user preferences merged with default config
+        const userSettings = user.UserProfile.recommendationSettings as RecommenderConfig ?? DEFAULT_CONFIG;
 
         // Get recommendations
         const recommendations = recommender.getRecommendations(
-          userList,
+          userList.map(item => ({
+            ...item,
+            readingStatus: 'COMPLETED',
+            likeStatus: item.likeStatus as "like" | "dislike" | null
+          })),
           user.UserProfile,
-          input.numRecommendations
+          input.limit + 1,
+          Array.from(allExcludedIds)
         );
 
-        console.log('Raw recommendations:', recommendations.slice(0, 3));
+        // Take only what we need for this page
+      const recommendationsForPage = recommendations.slice(0, input.limit);
+      const hasMore = recommendations.length > input.limit;
 
-        if (!recommendations.length) {
-          return [];
-        }
-
-        // Fetch manga details
+        // Fetch manga details in parallel
         const mangaDetails = await Promise.all(
           recommendations.map(async (rec) => {
             try {
               const manga = await getMangaById(rec.id);
+              
+              // Apply filters
+              if (input.minScore && (manga.averageScore ?? 0) < input.minScore) {
+                return null;
+              }
+              
+              if (input.genres?.length && 
+                  !input.genres.some(g => manga.genres.includes(g))) {
+                return null;
+              }
+              
+              if (input.excludeGenres?.length && 
+                  input.excludeGenres.some(g => manga.genres.includes(g))) {
+                return null;
+              }
+
               return {
                 id: manga.id,
                 title: manga.title.english ?? manga.title.romaji,
                 coverImage: manga.coverImage.large,
                 averageScore: manga.averageScore ?? 0,
                 genres: manga.genres,
-                similarity: rec.similarity
+                similarity: rec.similarity,
+                matchDetails: rec.matchDetails,
+                description: manga.description,
+                status: manga.status,
               };
             } catch (error) {
               console.error(`Failed to fetch manga ${rec.id}:`, error);
@@ -124,19 +232,65 @@ export const recommendationRouter = createTRPCRouter({
           })
         );
 
-        const validMangaDetails = mangaDetails
-          .filter((manga): manga is MangaRecommendation => manga !== null)
-          .sort((a, b) => b.similarity - a.similarity);
+          // Process results
+          const validMangaDetails = mangaDetails
+          .filter((manga): manga is NonNullable<typeof manga> => manga !== null)
+          .sort((a, b) => b.similarity - a.similarity)
+          .slice(0, input.limit);
 
-        console.log('Final recommendations:', {
-          count: validMangaDetails.length,
-          samples: validMangaDetails.slice(0, 3),
+        if (validMangaDetails.length === 0) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "No matching recommendations found",
+          });
+        }
+
+        // Update cache and history
+        const recommendationsWithMetadata = validMangaDetails.map(manga => ({
+          ...manga,  // Spreads all existing manga properties
+          metadata: {  // Adds a new metadata object with:
+            timestamp: Date.now(),  // Current time in milliseconds
+            lastViewed: new Date(),  // Current date/time
+            source: 'recommendation',  // Indicates where this data came from
+            popularity: 0,  // Default popularity value
+            favorites: 0,  // Default favorites count
+            status: (manga.status as "NOT_YET_RELEASED" | "FINISHED" | "RELEASING" | "CANCELLED" | "HIATUS") ?? "NOT_YET_RELEASED",  // Manga publication status
+            isAdult: false  // Whether it's adult content
+          }
+        }));
+        cache.set(ctx.auth.userId, cacheKey, recommendationsWithMetadata);
+        cache.addToHistory(ctx.auth.userId, recommendationsWithMetadata.map(m => m.id));
+        // console.log("recommendation metadata : ", recommendationsWithMetadata);
+
+        return {
+          items: recommendationsWithMetadata,
+          hasMore: validMangaDetails.length >= input.limit,
+          timing: performance.now() - start,
+          source: 'fresh',
+        };
+
+      } catch (error) {
+        console.error('Recommendation error:', error);
+        throw error;
+      }
+    }),
+
+  clearHistory: protectedProcedure.mutation(async ({ ctx }) => {
+    try {
+      if (!ctx.auth.userId) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "User ID is required"
         });
-
-        return validMangaDetails;
-      } 
-    }catch (error) {
-      console.error('Recommendation error:', error);
-      throw error;
-    }}),
+      }
+      cache.clearHistory(ctx.auth.userId);
+      return { success: true };
+    } catch (error) {
+      console.error('Error clearing history:', error);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to clear recommendation history",
+      });
+    }
+  })
 });

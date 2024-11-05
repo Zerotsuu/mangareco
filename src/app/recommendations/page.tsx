@@ -1,7 +1,6 @@
 'use client';
 import React from 'react';
 import { MangaRecommendations } from '~/app/_components/Recommendations';
-import { RecommendationSettings } from '../_components/RecommendationSettings';
 
 const RecommendationsPage: React.FC = () => {
   return (
