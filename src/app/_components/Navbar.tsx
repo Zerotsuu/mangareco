@@ -1,7 +1,7 @@
 // app/_components/Navbar.tsx
 import React from 'react';
 import Link from 'next/link';
-import { SignedIn, SignedOut, SignInButton, SignOutButton, SignUp, SignUpButton, UserButton } from '@clerk/nextjs';
+import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
 import { SearchBar } from './SearchBar';
 
 export const Navbar: React.FC = () => {

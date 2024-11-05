@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { api } from '~/utils/api';
 import { Loader2, BookPlus } from 'lucide-react';
+import { RecommendationSettings } from './RecommendationSettings';
 
 export const MangaRecommendations: React.FC = () => {
   const [numRecommendations, setNumRecommendations] = useState(10);
@@ -103,6 +104,10 @@ export const MangaRecommendations: React.FC = () => {
         <div className="mt-4 text-sm text-gray-600">
           <p>Based on {userList.mangaList.length} manga in your list</p>
         </div>
+      </div>
+
+      <div className="mb-8">
+        <RecommendationSettings />
       </div>
 
       {/* Error Display */}

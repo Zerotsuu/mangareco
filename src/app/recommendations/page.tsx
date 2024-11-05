@@ -10,9 +10,7 @@ const RecommendationsPage: React.FC = () => {
       <p className="text-gray-600 mb-6">
         Get personalized manga recommendations based on your reading list and preferences.
       </p>
-      <div className="mb-8">
-        <RecommendationSettings />
-      </div>
+      
       <MangaRecommendations />
     </div>
   );
