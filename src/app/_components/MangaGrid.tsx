@@ -1,9 +1,9 @@
 'use client';
 import React from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
 import { api } from '~/utils/api';
 import type { MangaPreview } from '~/server/api/routers/manga';
+import { MangaCard } from './MangaCard';
+import { Loader2 } from 'lucide-react';
 
 interface MangaGridProps {
   initialPage?: number;
@@ -26,44 +26,52 @@ export const MangaGrid: React.FC<MangaGridProps> = ({
 
   const displayManga = manga ?? data?.manga;
 
-  if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error.message}</div>;
-  if (!displayManga) return <div>No manga found</div>;
+  if (isLoading) return (
+    <div className="flex justify-center items-center py-12">
+      <Loader2 className="animate-spin h-8 w-8" />
+    </div>
+  );
+  
+  if (error) return (
+    <div className="text-center text-red-500 py-12">
+      Error: {error.message}
+    </div>
+  );
+  
+  if (!displayManga) return (
+    <div className="text-center text-gray-500 py-12">
+      No manga found
+    </div>
+  );
 
   return (
     <div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {displayManga.map((item: MangaPreview) => (
-          <Link href={`/manga/${item.id}`} key={item.id} className="block">
-            <div className="bg-white rounded-lg shadow-md p-4 overflow-hidden">
-              <Image
-                src={item.coverImage}
-                alt={item.title}
-                width={200}
-                height={300}
-                className="w-full h-96 object-cover mb-2 rounded"
-              />
-              <div className="p-2">
-                <h3 className="text-sm font-medium truncate">{item.title}</h3>
-                {/* <p className="text-xs text-gray-500">Score: {item.averageScore.toFixed(2)}</p> */}
-              </div>
-            </div>
-          </Link>
+          <MangaCard
+            key={item.id}
+            id={item.id}
+            title={item.title}
+            coverImage={item.coverImage}
+            averageScore={item.averageScore}
+            genres={item.genres ?? []}
+          />
         ))}
       </div>
+      
       {showPagination && data?.pageInfo && (
-        <div className="flex justify-center mt-4">
+        <div className="flex justify-center mt-8">
           <button
             onClick={() => setPage((prev) => prev - 1)}
             disabled={page === 1}
-            className="bg-white text-gray-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-100 mr-2"
+            className="bg-white text-gray-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-100 mr-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Previous
           </button>
           <button
             onClick={() => setPage((prev) => prev + 1)}
             disabled={!data.pageInfo.hasNextPage}
-            className="bg-white text-gray-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-100"
+            className="bg-white text-gray-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Next
           </button>

@@ -13,6 +13,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { MangaCard } from './MangaCard';
 // import debounce from 'lodash.debounce';
 // import { useInView } from 'react-intersection-observer';
 import { RecommendationSettings } from './RecommendationSettings';
@@ -203,7 +204,7 @@ export const MangaRecommendations: React.FC = () => {
               </button>
             )}
 
-            <button
+            {/* <button
               onClick={() => setShowFilters(!showFilters)}
               className="flex items-center gap-2 bg-gray-100 text-gray-700 px-3 py-2rounded-lg hover:bg-gray-200 transition-colors"
               title="Filter recommendations"
@@ -215,7 +216,7 @@ export const MangaRecommendations: React.FC = () => {
                   showFilters ? 'rotate-180' : ''
                 }`}
               />
-            </button>
+            </button> */}
           </div>
           {/* Settings */}
         <RecommendationSettings />
@@ -388,51 +389,15 @@ export const MangaRecommendations: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
                 >
-                  <Link
-                    href={`/manga/${manga.id}`}
-                    className="block group"
-                  >
-                    <div className="border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
-                      <div className="relative aspect-[2/3] overflow-hidden">
-                        <Image
-                          src={manga.coverImage}
-                          alt={manga.title}
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-200"
-                          sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
-                          loading={index < 10 ? "eager" : "lazy"}
-                        />
-                      </div>
-                      <div className="p-3">
-                        <h3 
-                          className="font-semibold text-sm mb-1 truncate"
-                          title={manga.title}
-                        >
-                          {manga.title}
-                        </h3>
-                        <div className="space-y-1">
-                          <div className="flex justify-between items-center">
-                            <p className="text-xs text-gray-600">
-                              Score: {manga.averageScore.toFixed(1)}
-                            </p>
-                            <p className="text-xs font-medium text-blue-600">
-                              {(manga.similarity * 100).toFixed(0)}% Match
-                            </p>
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {manga.genres.slice(0, 2).map((genre) => (
-                              <span
-                                key={genre}
-                                className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded"
-                              >
-                                {genre}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
+                  <MangaCard
+                        key={manga.id}
+                        id={manga.id}
+                        title={manga.title}
+                        coverImage={manga.coverImage}
+                        averageScore={manga.averageScore}
+                        genres={manga.genres}
+                        similarity={manga.similarity}                     
+                  />
                 </motion.div>
               ))}
             </div>

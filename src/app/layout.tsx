@@ -6,6 +6,7 @@ import { Inter } from "next/font/google";
 import { TRPCReactProvider } from "~/trpc/react";
 import React from "react";
 import { ProfileModal } from "./_components/ProfileModal";
+import { MangaModalProvider } from "./_contexts/MangaModalContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -26,14 +27,16 @@ export default function RootLayout({
       <html lang="en">
         <body className={`font-sans ${inter.variable}`}>
           <TRPCReactProvider>
-            <Navbar />
-            <main>
-              <SignedIn>
-                <ProfileModal/>
-                {children}
-              </SignedIn>
-              <SignedOut>{children}</SignedOut>
-            </main>
+            <MangaModalProvider>
+              <Navbar />
+              <main>
+                <SignedIn>
+                  <ProfileModal/>
+                  {children}
+                </SignedIn>
+                <SignedOut>{children}</SignedOut>
+              </main>
+            </MangaModalProvider>
           </TRPCReactProvider>
         </body>
       </html>

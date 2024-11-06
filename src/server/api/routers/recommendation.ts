@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { ContentBasedRecommender } from "~/server/services/recommendations/ContentBasedRecommender";
+import { CollaborativeRecommender } from "~/server/services/recommendations/CollaborativeRecommender";
 import { TRPCError } from "@trpc/server";
 import { performance } from 'perf_hooks';
 import path from 'path';
@@ -9,7 +10,8 @@ import { getMangaById } from "~/utils/anilist-api";
 import type {
   MangaRecommendation,
   RecommenderConfig,
-  CacheEntry
+  CacheEntry,
+  ReadingStatus
 } from "~/server/services/recommendations/types";
 import { DEFAULT_CONFIG } from "~/server/services/recommendations/types";
 
@@ -60,6 +62,7 @@ class RecommendationCache {
 
 // Initialize recommender with error handling and retries
 let recommender: ContentBasedRecommender | null = null;
+let collaborativeRecommender: CollaborativeRecommender | null = null;
 let initializationPromise: Promise<void> | null = null;
 const cache = new RecommendationCache();
 
@@ -75,7 +78,8 @@ const initializeRecommender = async (retries = 3): Promise<void> => {
     }
 
     recommender = new ContentBasedRecommender(csvData);
-    console.log('Recommender initialized successfully');
+    collaborativeRecommender = new CollaborativeRecommender();
+    console.log('Recommenders initialized successfully');
   } catch (error) {
     if (retries > 0) {
       console.warn(`Retrying recommender initialization. Attempts left: ${retries - 1}`);
@@ -103,6 +107,28 @@ const getRecommender = async (): Promise<ContentBasedRecommender> => {
     return recommender;
   } catch (error) {
     console.error('Failed to initialize recommender:', error);
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to initialize recommendation system",
+    });
+  }
+};
+
+const getCollaborativeRecommender = async (): Promise<CollaborativeRecommender> => {
+  if (collaborativeRecommender) return collaborativeRecommender;
+
+  if (!initializationPromise) {
+    initializationPromise = initializeRecommender();
+  }
+
+  try {
+    await initializationPromise;
+    if (!collaborativeRecommender) {
+      throw new Error('Collaborative recommender failed to initialize');
+    }
+    return collaborativeRecommender;
+  } catch (error) {
+    console.error('Failed to initialize collaborative recommender:', error);
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
       message: "Failed to initialize recommendation system",
@@ -319,95 +345,129 @@ export const recommendationRouter = createTRPCRouter({
     }
   }),
 
-  getCollaborativeRecommendations: protectedProcedure
-    .input(z.object({
-      limit: z.number().min(1).max(50).default(20),
-      excludeIds: z.array(z.number()).default([]),
-    }))
-    .query(async ({ ctx, input }) => {
-      const start = performance.now();
-
-      try {
-        if (!ctx.auth.userId) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "User not authenticated",
-          });
-        }
-
-        // Get user's manga list
-        const user = await ctx.db.user.findUnique({
-          where: { clerkId: ctx.auth.userId },
-          include: {
-            mangaList: true,
-          },
+  // Add new procedure to get user similarity information
+  getUserSimilarityInfo: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      if (!ctx.auth.userId) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "User not authenticated",
         });
-
-        if (!user || !user.mangaList) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "User data not found",
-          });
-        }
-
-        const recommenderInstance = await getRecommender();
-        if (!recommenderInstance) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Recommender not initialized",
-          });
-        }
-
-        // Get recommendations using collaborative filtering
-        const collaborativeRecs = recommenderInstance.getRecommendations(
-          user.mangaList.map(item => ({
-            mangaId: item.mangaId,
-            readingStatus: 'COMPLETED',
-            likeStatus: null
-          })),
-          {
-            recommendationSettings: DEFAULT_CONFIG,
-            id: "",
-            userId: "",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            experience: null,
-            favoriteGenres: []
-          },
-          input.limit,
-          Array.from(new Set(input.excludeIds))
-        );
-
-        // Fetch manga details for recommendations
-        const mangaDetails = await Promise.all(
-          collaborativeRecs.map(async (rec) => {
-            try {
-              const manga = await getMangaById(rec.id);
-              return {
-                id: manga.id,
-                title: manga.title.english ?? manga.title.romaji,
-                coverImage: manga.coverImage.large,
-                averageScore: manga.averageScore ?? 0,
-                genres: manga.genres,
-                similarity: rec.similarity,
-                description: manga.description,
-              };
-            } catch (error) {
-              console.error(`Failed to fetch manga ${rec.id}:`, error);
-              return null;
-            }
-          })
-        );
-
-        const validMangaDetails = mangaDetails.filter((manga): manga is NonNullable<typeof manga> => manga !== null);
-
-        return {
-          items: validMangaDetails,
-          timing: performance.now() - start,
-        };
-      } catch (error) {
-        console.error('Collaborative recommendation error:', error);
-        throw error;
       }
-    }),
+
+      const collaborativeRecommender = await getCollaborativeRecommender();
+
+      // Load all users' data
+      await collaborativeRecommender.loadAllUsersData(ctx.db);
+
+      const similarityInfo = collaborativeRecommender.getUserSimilarityDetails(ctx.auth.userId);
+      const allUsers = collaborativeRecommender.getAllUsers();
+
+      return {
+        similarUsers: similarityInfo.similarUsers,
+        totalUsers: similarityInfo.totalUsers,
+        userMangaCount: similarityInfo.userMangaCount,
+        allUsers: allUsers,
+      };
+    } catch (error) {
+      console.error('Error getting user similarity info:', error);
+      throw error;
+    }
+  }),
+
+  getCollaborativeRecommendations: protectedProcedure
+  .input(z.object({
+    limit: z.number().min(1).max(50).default(20),
+    excludeIds: z.array(z.number()).default([]),
+  }))
+  .query(async ({ ctx, input }) => {
+    const start = performance.now();
+
+    try {
+      if (!ctx.auth.userId) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "User not authenticated",
+        });
+      }
+
+      // Get user's manga list
+      const user = await ctx.db.user.findUnique({
+        where: { clerkId: ctx.auth.userId },
+        include: {
+          mangaList: true,
+        },
+      });
+
+      if (!user || !user.mangaList) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User data not found",
+        });
+      }
+
+      const collaborativeRecommender = await getCollaborativeRecommender();
+
+      await collaborativeRecommender.loadAllUsersData(ctx.db);
+
+      const similarityInfo = collaborativeRecommender.getUserSimilarityDetails(ctx.auth.userId);
+      console.log('Similarity info:', {
+        totalUsers: similarityInfo.totalUsers,
+        similarUsers: similarityInfo.similarUsers.length,
+        userMangaCount: similarityInfo.userMangaCount
+      });
+
+      // Update user interactions
+      collaborativeRecommender.updateUserInteractions(
+        ctx.auth.userId,
+        user.mangaList.map(item => ({
+          mangaId: item.mangaId,
+          readingStatus: 'COMPLETED' as ReadingStatus,
+          likeStatus: item.likeStatus as "like" | "dislike" | null
+        }))
+      );
+
+      // Get collaborative recommendations
+      const collaborativeRecs = collaborativeRecommender.getRecommendations(
+        ctx.auth.userId,
+        input.limit,
+        new Set(input.excludeIds)
+      );
+
+      // Debug logs after we have the data
+      console.log('User manga list length:', user.mangaList.length);
+      console.log('Recommendations found:', collaborativeRecs.length);
+
+      // Fetch manga details for recommendations
+      const mangaDetails = await Promise.all(
+        collaborativeRecs.map(async (rec) => {
+          try {
+            const manga = await getMangaById(rec.mangaId);
+            return {
+              id: manga.id,
+              title: manga.title.english ?? manga.title.romaji,
+              coverImage: manga.coverImage.large,
+              averageScore: manga.averageScore ?? 0,
+              genres: manga.genres,
+              userCount: rec.userCount,
+              description: manga.description,
+            };
+          } catch (error) {
+            console.error(`Failed to fetch manga ${rec.mangaId}:`, error);
+            return null;
+          }
+        })
+      );
+
+      const validMangaDetails = mangaDetails.filter((manga): manga is NonNullable<typeof manga> => manga !== null);
+
+      return {
+        items: validMangaDetails,
+        timing: performance.now() - start,
+      };
+    } catch (error) {
+      console.error('Collaborative recommendation error:', error);
+      throw error;
+    }
+  }),
 });

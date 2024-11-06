@@ -6,8 +6,8 @@ import Image from 'next/image';
 import { AddToListButton } from './AddToListButton';
 import { LikeDislikeButton } from './LikeDislikeButton';
 import { RemoveFromListButton } from './RemoveFromListButton';
-
-// type MangaDetails = RouterOutputs['manga']['getById'];
+import { api } from '~/utils/api';
+import { LoadingSpinner } from './LoadingSpinner';
 interface MangaDetails {
   id: number;
   title: string;
@@ -22,13 +22,28 @@ interface MangaDetails {
 
 interface MangaDetailsViewProps {
   manga: MangaDetails | null;
+  isModal?: boolean;
+}
+interface MangaDetailsViewProps {
+  manga: MangaDetails | null;
+  isModal?: boolean;
 }
 
-export const MangaDetailsView: React.FC<MangaDetailsViewProps> = ({ manga }) => {
-  if (!manga) return <div>Manga not found</div>;
+export const MangaDetailsView: React.FC<MangaDetailsViewProps> = ({ manga: initialManga, isModal = false }) => {
+  const utils = api.useContext();
+  // Fetch real-time manga data
+  const { data: manga } = api.manga.getById.useQuery(
+    { id: initialManga?.id ?? 0 },
+    { 
+      initialData: initialManga ?? undefined,
+      enabled: !!initialManga 
+    }
+  );
+
+  if (!manga) return <LoadingSpinner />;
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className={isModal ? 'p-6':"container mx-auto px-4 py-8"}>
       <div className="flex flex-col md:flex-row">
         <div className="md:w-1/3">
           <Image
@@ -43,11 +58,29 @@ export const MangaDetailsView: React.FC<MangaDetailsViewProps> = ({ manga }) => 
           <h1 className="text-3xl font-bold">{manga.title}</h1>
           <p className="text-gray-600 mt-2">by {manga.author}</p>
           <div className="mt-4 flex items-center">
-            <LikeDislikeButton mangaId={manga.id} initialLikeStatus={manga.userLikeStatus} />
+            <LikeDislikeButton 
+              mangaId={manga.id} 
+              initialLikeStatus={manga.userLikeStatus}
+              onSuccess={() => {
+                void utils.manga.getById.invalidate({ id: manga.id });
+              }}
+            />
             {manga.isInUserList ? (
-              <RemoveFromListButton mangaId={manga.id} />
+              <RemoveFromListButton 
+                mangaId={manga.id}
+                onSuccess={() => {
+                  void utils.manga.getById.invalidate({ id: manga.id });
+                  void utils.mangaList.getUserList.invalidate();
+                }}
+              />
             ) : (
-              <AddToListButton mangaId={manga.id} />
+              <AddToListButton 
+                mangaId={manga.id}
+                onSuccess={() => {
+                  void utils.manga.getById.invalidate({ id: manga.id });
+                  void utils.mangaList.getUserList.invalidate();
+                }}
+              />
             )}
             <span className="ml-4 text-lg font-semibold">Score: {manga.averageScore}</span>
           </div>

@@ -1,5 +1,6 @@
 // src/server/services/recommendations/CollaborativeRecommender.ts
 
+import { PrismaClient } from '@prisma/client';
 import type { UserMangaItem } from './types';
 
 interface UserSimilarity {
@@ -10,6 +11,7 @@ interface UserSimilarity {
 interface MangaSimilarity {
   mangaId: number;
   score: number;
+  userCount: number;
 }
 
 export class CollaborativeRecommender {
@@ -23,27 +25,47 @@ export class CollaborativeRecommender {
     this.minSimilarity = minSimilarity;
   }
 
-  // Add or update a user's manga interactions
+  public getAllUsers(): { userId: string; mangaCount: number }[] {
+    return Array.from(this.userMangaMatrix.entries()).map(([userId, mangaList]) => ({
+      userId,
+      mangaCount: mangaList.size
+    }));
+  }
+
   public updateUserInteractions(userId: string, items: UserMangaItem[]): void {
     const userInteractions = new Map<number, UserMangaItem>();
     items.forEach(item => userInteractions.set(item.mangaId, item));
     this.userMangaMatrix.set(userId, userInteractions);
-    // Clear cached similarities for this user
     this.userSimilarityCache.delete(userId);
   }
 
-  // Calculate similarity between two users using Pearson correlation
+  public getUserSimilarityDetails(userId: string): {
+    similarUsers: UserSimilarity[];
+    totalUsers: number;
+    userMangaCount: number;
+  } {
+    const similarUsers = this.findSimilarUsers(userId);
+    const userMangaCount = this.userMangaMatrix.get(userId)?.size ?? 0;
+
+    return {
+      similarUsers,
+      totalUsers: this.userMangaMatrix.size,
+      userMangaCount
+    };
+  }
+
+
+
   private calculateUserSimilarity(user1: string, user2: string): number {
     const user1Items = this.userMangaMatrix.get(user1);
     const user2Items = this.userMangaMatrix.get(user2);
 
     if (!user1Items || !user2Items) return 0;
 
-    // Find common manga between users
     const commonManga = Array.from(user1Items.keys())
       .filter(mangaId => user2Items.has(mangaId));
 
-    if (commonManga.length < 5) return 0; // Require minimum common items
+    if (commonManga.length < 2) return 0;
 
     let sum1 = 0, sum2 = 0, sum1Sq = 0, sum2Sq = 0, pSum = 0;
     const n = commonManga.length;
@@ -59,28 +81,42 @@ export class CollaborativeRecommender {
       pSum += rating1 * rating2;
     });
 
-    // Calculate Pearson correlation coefficient
     const num = pSum - (sum1 * sum2 / n);
     const den = Math.sqrt(
       (sum1Sq - sum1 ** 2 / n) *
       (sum2Sq - sum2 ** 2 / n)
     );
 
-    return den === 0 ? 0 : num / den;
+    if (den === 0) return 0;
+
+    // Calculate similarity and ensure it's between 0 and 1
+    const rawSimilarity = num / den;
+    const normalizedSimilarity = Math.max(0, Math.min(1, (rawSimilarity + 1) / 2));
+
+    console.log(`Raw similarity: ${rawSimilarity}, Normalized: ${normalizedSimilarity}`);
+
+    return normalizedSimilarity;
   }
 
-  // Convert like/dislike status to numeric rating
   private getRatingValue(item: UserMangaItem): number {
+    let rating = 0;
     switch (item.likeStatus) {
-      case 'like': return 1;
-      case 'dislike': return -1;
-      default: return 0;
+      case 'like': rating = 0.8; break;
+      case 'dislike': rating = 0.8; break;
+      default: rating = 0;
     }
+
+    switch (item.readingStatus) {
+      case 'COMPLETED': rating *= 1.1; break;
+      case 'READING': rating *= 1.0; break;
+      case 'PLAN_TO_READ': rating *= 0.9; break;
+      default: rating *= 0.9;
+    }
+
+    return rating;
   }
 
-  // Find similar users
   private findSimilarUsers(userId: string): UserSimilarity[] {
-    // Check cache first
     if (this.userSimilarityCache.has(userId)) {
       return this.userSimilarityCache.get(userId)!;
     }
@@ -95,14 +131,38 @@ export class CollaborativeRecommender {
       }
     });
 
-    // Sort by similarity and cache results
     const sortedSimilarities = similarities.sort((a, b) => b.similarity - a.similarity);
     this.userSimilarityCache.set(userId, sortedSimilarities);
 
     return sortedSimilarities;
   }
 
-  // Get recommendations for a user
+  // Add method to load all users' data
+  public async loadAllUsersData(prisma: PrismaClient): Promise<void> {
+    const allUsers = await prisma.user.findMany({
+      include: {
+        mangaList: true
+      }
+    });
+
+    console.log(`Loading data for ${allUsers.length} users`);
+
+    allUsers.forEach(user => {
+      if (user.mangaList && user.mangaList.length > 0) {
+        this.updateUserInteractions(
+          user.clerkId,
+          user.mangaList.map(item => ({
+            mangaId: item.mangaId,
+            readingStatus: 'COMPLETED',
+            likeStatus: item.likeStatus as "like" | "dislike" | null
+          }))
+        );
+      }
+    });
+
+    console.log(`Loaded data for ${this.userMangaMatrix.size} users`);
+  }
+
   public getRecommendations(
     userId: string,
     limit: number,
@@ -112,36 +172,49 @@ export class CollaborativeRecommender {
     if (!userItems) return [];
 
     const similarUsers = this.findSimilarUsers(userId);
-    const recommendationScores = new Map<number, { score: number, count: number }>();
+    console.log(`Found ${similarUsers.length} similar users for user ${userId}`);
 
-    // Aggregate recommendations from similar users
+    const recommendationScores = new Map<number, { score: number, count: number, userCount:number }>(); 
+
+    // First pass: count how many users have each manga
+    const mangaUserCounts = new Map<number, number>();
+    this.userMangaMatrix.forEach((userItems) => {
+      userItems.forEach((_, mangaId) => {
+        mangaUserCounts.set(mangaId, (mangaUserCounts.get(mangaId) ?? 0) + 1);
+      });
+    });
+
     similarUsers.forEach(({ userId: similarUserId, similarity }) => {
       const similarUserItems = this.userMangaMatrix.get(similarUserId);
       if (!similarUserItems) return;
+
+      console.log(`Processing similar user ${similarUserId} with similarity ${similarity}`);
 
       similarUserItems.forEach((item, mangaId) => {
         if (!userItems.has(mangaId) && !excludeIds.has(mangaId)) {
           const rating = this.getRatingValue(item);
           const weightedRating = rating * similarity;
+          const userCount = mangaUserCounts.get(mangaId) ?? 0;
 
-          const current = recommendationScores.get(mangaId) ?? { score: 0, count: 0 };
+          const current = recommendationScores.get(mangaId) ?? { score: 0, count: 0 , userCount:userCount};
           recommendationScores.set(mangaId, {
             score: current.score + weightedRating,
-            count: current.count + 1
+            count: current.count + 1,
+            userCount:userCount
           });
         }
       });
     });
 
-    // Calculate final scores and sort recommendations
-    const recommendations: MangaSimilarity[] = Array.from(recommendationScores.entries())
-      .map(([mangaId, { score, count }]) => ({
+
+
+    return Array.from(recommendationScores.entries())
+      .map(([mangaId, { score, count, userCount }]) => ({
         mangaId,
-        score: score / count // Normalize by number of ratings
+        score: score / count,
+        userCount: userCount
       }))
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
-
-    return recommendations;
   }
 }

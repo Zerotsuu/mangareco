@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '~/utils/api';
 import Image from 'next/image';
 import Link from 'next/link';
+import { MangaCard } from '../_components/MangaCard';
 
 interface MangaDetails {
   id: number;
@@ -45,22 +46,14 @@ const UserListPage: React.FC = () => {
         {userData?.mangaList?.map((item: MangaListItem) => {
           const manga = mangaData?.find(m => m.id === item.mangaId);
           return (  
-            <Link key={item.id} href={`/manga/${item.mangaId}`}>
-              <div className="border rounded-lg p-4 shadow-md text-center">
-                {manga && (
-                  <Image
-                    src={manga.coverImage}
-                    alt={manga.title}
-                    width={200}
-                    height={300}
-                    className="w-full h-96 object-cover mb-2 rounded"
-                  />
-                )}
-                <h2 className="text-xl font-semibold mb-2">{manga?.title ?? `Manga ${item.mangaId}`}</h2>
-                <p className="text-gray-600">Status: {item.status}</p>
-                {item.likeStatus && <p className="text-gray-600">Like Status: {item.likeStatus}</p>}
-              </div>
-            </Link>
+            <MangaCard
+                  key={item.id}
+                  id={item.mangaId}
+                  title={manga?.title ?? `Manga ${item.mangaId}`}
+                  coverImage={manga?.coverImage ?? ''}
+                  status={item.status}
+                  likeStatus={item.likeStatus}
+                />
           );
         })}
       </div>
