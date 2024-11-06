@@ -317,5 +317,97 @@ export const recommendationRouter = createTRPCRouter({
         message: "Failed to clear recommendation history",
       });
     }
-  })
+  }),
+
+  getCollaborativeRecommendations: protectedProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(50).default(20),
+      excludeIds: z.array(z.number()).default([]),
+    }))
+    .query(async ({ ctx, input }) => {
+      const start = performance.now();
+
+      try {
+        if (!ctx.auth.userId) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "User not authenticated",
+          });
+        }
+
+        // Get user's manga list
+        const user = await ctx.db.user.findUnique({
+          where: { clerkId: ctx.auth.userId },
+          include: {
+            mangaList: true,
+          },
+        });
+
+        if (!user || !user.mangaList) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "User data not found",
+          });
+        }
+
+        const recommenderInstance = await getRecommender();
+        if (!recommenderInstance) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Recommender not initialized",
+          });
+        }
+
+        // Get recommendations using collaborative filtering
+        const collaborativeRecs = recommenderInstance.getRecommendations(
+          user.mangaList.map(item => ({
+            mangaId: item.mangaId,
+            readingStatus: 'COMPLETED',
+            likeStatus: null
+          })),
+          {
+            recommendationSettings: DEFAULT_CONFIG,
+            id: "",
+            userId: "",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            experience: null,
+            favoriteGenres: []
+          },
+          input.limit,
+          Array.from(new Set(input.excludeIds))
+        );
+
+        // Fetch manga details for recommendations
+        const mangaDetails = await Promise.all(
+          collaborativeRecs.map(async (rec) => {
+            try {
+              const manga = await getMangaById(rec.id);
+              return {
+                id: manga.id,
+                title: manga.title.english ?? manga.title.romaji,
+                coverImage: manga.coverImage.large,
+                averageScore: manga.averageScore ?? 0,
+                genres: manga.genres,
+                similarity: rec.similarity,
+                description: manga.description,
+              };
+            } catch (error) {
+              console.error(`Failed to fetch manga ${rec.id}:`, error);
+              return null;
+            }
+          })
+        );
+
+        const validMangaDetails = mangaDetails.filter((manga): manga is NonNullable<typeof manga> => manga !== null);
+
+        return {
+          items: validMangaDetails,
+          timing: performance.now() - start,
+        };
+      } catch (error) {
+        console.error('Collaborative recommendation error:', error);
+        throw error;
+      }
+    }),
 });

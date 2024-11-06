@@ -1,3 +1,4 @@
+
 import {
   type MangaFeatures,
   type SimilarityResult,
@@ -291,5 +292,8 @@ export class ContentBasedRecommender {
       averageFeatures: Array.from(this.mangaFeatures.values())
         .reduce((acc, manga) => acc + manga.features.length, 0) / this.mangaFeatures.size
     };
+  }
+  public getManga(id: number): MangaFeatures | undefined {
+    return this.mangaFeatures.get(id);
   }
 }
