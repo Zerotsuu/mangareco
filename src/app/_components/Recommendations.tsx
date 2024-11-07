@@ -390,6 +390,7 @@ export const MangaRecommendations: React.FC = () => {
                   transition={{ delay: index * 0.1 }}
                 >
                   <MangaCard
+                  
                         key={manga.id}
                         id={manga.id}
                         title={manga.title}

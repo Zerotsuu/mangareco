@@ -49,6 +49,7 @@ export const MangaDetailsView: React.FC<MangaDetailsViewProps> = ({ manga: initi
         <div className="md:w-2/5">
           <div className="sticky top-4">
             <Image
+              unoptimized
               src={manga.coverImage}
               alt={manga.title}
               width={500}

@@ -35,6 +35,7 @@ export const MangaCard: React.FC<MangaCardProps> = ({
           <div className="border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
             <div className="relative aspect-[2/3] overflow-hidden">
               <Image
+                unoptimized
                 src={coverImage}
                 alt={title}
                 fill

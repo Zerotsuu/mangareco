@@ -13,6 +13,7 @@ const config = {
       defaultLocale: "en",
     },
     images: {
+      unoptimized:true,
       domains: [
         "s4.anilist.co",
         "img.anili.st",

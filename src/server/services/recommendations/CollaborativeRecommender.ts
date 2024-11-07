@@ -1,5 +1,5 @@
 // src/server/services/recommendations/CollaborativeRecommender.ts
-import { PrismaClient } from '@prisma/client';
+import { type PrismaClient } from '@prisma/client';
 import type { UserMangaItem } from './types';
 
 interface UserSimilarity {
