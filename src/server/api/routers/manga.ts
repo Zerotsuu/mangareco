@@ -1,6 +1,13 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "~/server/api/trpc";
-import { getPopularManga, getMangaById, type AnilistManga, searchManga } from "~/utils/anilist-api";
+import { 
+  getAllTimePopularManga, 
+  getTrendingManga, 
+  getTop100Manga,
+  getMangaById, 
+  type AnilistManga, 
+  searchManga 
+} from "~/utils/anilist-api";
 import { db } from "~/server/db";
 
 interface MangaPreview {
@@ -15,7 +22,7 @@ interface MangaPreview {
 interface MangaDetail extends MangaPreview {
   author: string;
   userLikeStatus: "like" | "dislike" | null
-  isInUserList:boolean;
+  isInUserList: boolean;
 }
 
 interface PaginatedMangaResponse {
@@ -30,11 +37,12 @@ interface PaginatedMangaResponse {
 }
 
 export const mangaRouter = createTRPCRouter({
-  getPopular: publicProcedure
+  // Get trending manga
+  getTrending: publicProcedure
     .input(z.object({ page: z.number().default(1), perPage: z.number().default(20) }))
     .query(async ({ input }): Promise<PaginatedMangaResponse> => {
-      const result = await getPopularManga(input.page, input.perPage);
-      const mangaPreviews= result.manga.map((m: AnilistManga): MangaPreview => ({
+      const result = await getTrendingManga(input.page, input.perPage);
+      const mangaPreviews = result.manga.map((m: AnilistManga): MangaPreview => ({
         id: m.id,
         title: m.title.english ?? m.title.romaji,
         coverImage: m.coverImage.large,
@@ -48,7 +56,45 @@ export const mangaRouter = createTRPCRouter({
       };
     }),
 
-    getById: protectedProcedure
+  // Get all-time popular manga (renamed from getPopular)
+  getAllTimePopular: publicProcedure
+    .input(z.object({ page: z.number().default(1), perPage: z.number().default(20) }))
+    .query(async ({ input }): Promise<PaginatedMangaResponse> => {
+      const result = await getAllTimePopularManga(input.page, input.perPage);
+      const mangaPreviews = result.manga.map((m: AnilistManga): MangaPreview => ({
+        id: m.id,
+        title: m.title.english ?? m.title.romaji,
+        coverImage: m.coverImage.large,
+        description: m.description,
+        genres: m.genres,
+        averageScore: m.averageScore,
+      }));
+      return {
+        manga: mangaPreviews,
+        pageInfo: result.pageInfo,
+      };
+    }),
+
+  // Get top 100 manga
+  getTop100: publicProcedure
+    .input(z.object({ page: z.number().default(1), perPage: z.number().default(20) }))
+    .query(async ({ input }): Promise<PaginatedMangaResponse> => {
+      const result = await getTop100Manga(input.page, input.perPage);
+      const mangaPreviews = result.manga.map((m: AnilistManga): MangaPreview => ({
+        id: m.id,
+        title: m.title.english ?? m.title.romaji,
+        coverImage: m.coverImage.large,
+        description: m.description,
+        genres: m.genres,
+        averageScore: m.averageScore,
+      }));
+      return {
+        manga: mangaPreviews,
+        pageInfo: result.pageInfo,
+      };
+    }),
+
+  getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }): Promise<MangaDetail> => {
       const manga = await getMangaById(input.id);
@@ -87,7 +133,7 @@ export const mangaRouter = createTRPCRouter({
       };
     }),
 
-    getByIds: publicProcedure
+  getByIds: publicProcedure
     .input(z.object({ ids: z.array(z.number()) }))
     .query(async ({ input }): Promise<MangaDetail[]> => {
       const mangaPromises = input.ids.map(async (id) => {
@@ -106,7 +152,8 @@ export const mangaRouter = createTRPCRouter({
       });
       return Promise.all(mangaPromises);
     }),
-    search: publicProcedure
+
+  search: publicProcedure
     .input(z.object({
       query: z.string(),
       page: z.number().int().positive(),
@@ -116,6 +163,6 @@ export const mangaRouter = createTRPCRouter({
       const { query, page, perPage } = input;
       return await searchManga(query, page, perPage);
     }),
-  });
+});
 
 export type { MangaPreview, MangaDetail, PaginatedMangaResponse };

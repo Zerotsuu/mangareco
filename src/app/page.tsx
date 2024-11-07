@@ -1,18 +1,12 @@
-
 // app/page.tsx
-import { MangaGrid } from '~/app/_components/MangaGrid'; 
-// import { api } from '~/trpc/server';
-// import type { MangaPreview } from '~/server/api/routers/manga';
+import { MangaTabs } from '~/app/_components/MangaTabs';
 
-export const dynamic = 'force-dynamic';
-
-export default async function Home() {
-  // const popularManga : MangaPreview[] = await api.manga.getPopular({ page: 1, perPage: 20 });
-
+export default function Home() {
   return (
-      <main className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6">Popular Manga</h1>
-        <MangaGrid />
-      </main>
+    <main className="container mx-auto px-4 py-8">
+      <MangaTabs />
+    </main>
   );
 }
+
+export const dynamic = 'force-dynamic';

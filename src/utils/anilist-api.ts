@@ -191,7 +191,7 @@ class RateLimitedGraphQLClient {
 
 export const anilistClient = new RateLimitedGraphQLClient(ANILIST_API_ENDPOINT);
 
-export const getPopularManga = async (page: number, perPage: number): Promise<PaginatedMangaResult> => {
+export const getTrendingManga = async (page: number, perPage: number): Promise<PaginatedMangaResult> => {
   const query = `
     query ($page: Int, $perPage: Int) {
       Page(page: $page, perPage: $perPage) {
@@ -202,7 +202,12 @@ export const getPopularManga = async (page: number, perPage: number): Promise<Pa
           hasNextPage
           perPage
         }
-        media(type: MANGA, sort: POPULARITY_DESC, isAdult: false, countryOfOrigin: JP) {
+        media(
+          type: MANGA,
+          sort: [TRENDING_DESC, POPULARITY_DESC],
+          isAdult: false,
+          countryOfOrigin: JP
+        ) {
           id
           title {
             romaji
@@ -220,7 +225,107 @@ export const getPopularManga = async (page: number, perPage: number): Promise<Pa
   `;
 
   const variables: PageVariables = { page, perPage };
-  const cacheKey = `popular-${page}-${perPage}`;
+  const cacheKey = `trending-${page}-${perPage}`;
+  
+  const data = await anilistClient.request<PaginatedResponse>(
+    query, 
+    variables,
+    cacheKey
+  );
+  
+  return {
+    manga: data.Page.media,
+    pageInfo: data.Page.pageInfo
+  };
+};
+
+export const getTop100Manga = async (page: number, perPage: number): Promise<PaginatedMangaResult> => {
+  const query = `
+    query ($page: Int, $perPage: Int) {
+      Page(page: $page, perPage: $perPage) {
+        pageInfo {
+          total
+          currentPage
+          lastPage
+          hasNextPage
+          perPage
+        }
+        media(
+          type: MANGA,
+          sort: [SCORE_DESC, POPULARITY_DESC],
+          isAdult: false,
+          countryOfOrigin: JP,
+        ) {
+          id
+          title {
+            romaji
+            english
+          }
+          coverImage {
+            large
+          }
+          description
+          genres
+          averageScore
+          popularity
+        }
+      }
+    }
+  `;
+
+  const variables: PageVariables = { page, perPage };
+  const cacheKey = `top100-${page}-${perPage}`;
+  
+  const data = await anilistClient.request<PaginatedResponse>(
+    query, 
+    variables,
+    cacheKey
+  );
+  
+  return {
+    manga: data.Page.media,
+    pageInfo: data.Page.pageInfo
+  };
+};
+
+
+export const getAllTimePopularManga = async (page: number, perPage: number): Promise<PaginatedMangaResult> => {
+  const query = `
+    query ($page: Int, $perPage: Int) {
+      Page(page: $page, perPage: $perPage) {
+        pageInfo {
+          total
+          currentPage
+          lastPage
+          hasNextPage
+          perPage
+        }
+        media(
+          type: MANGA,
+          sort: POPULARITY_DESC,
+          isAdult: false,
+          countryOfOrigin: JP
+        ) {
+          id
+          title {
+            romaji
+            english
+          }
+          coverImage {
+            large
+          }
+          description
+          genres
+          averageScore
+          popularity
+        }
+      }
+    }
+  `;
+
+
+  const variables: PageVariables = { page, perPage };
+  const cacheKey = `all-time-pupular-${page}-${perPage}`;
   
   const data = await anilistClient.request<PaginatedResponse>(
     query, 

@@ -14,9 +14,8 @@ import type {
   ReadingStatus
 } from "~/server/services/recommendations/types";
 import { DEFAULT_CONFIG } from "~/server/services/recommendations/types";
-import { MatrixFactorizationRecommender } from "~/server/services/recommendations/MatrixFactorizationRecommender";
+// import { MatrixFactorizationRecommender } from "~/server/services/recommendations/MatrixFactorizationRecommender";
 
-// Simple in-memory cache implementation
 class RecommendationCache {
   private cache = new Map<string, CacheEntry<MangaRecommendation[]>>();
   private history = new Map<string, Set<number>>();
@@ -197,7 +196,10 @@ export const recommendationRouter = createTRPCRouter({
           },
         });
 
-        console.log('User list length:', userList.length); // Debug log
+        console.log('Debug - User list:', {
+          length: userList.length,
+          sampleItems: userList.slice(0, 3)
+        });
 
         if (!userList || userList.length < 5) {
           throw new TRPCError({
@@ -250,22 +252,28 @@ export const recommendationRouter = createTRPCRouter({
           recommendations.map(async (rec) => {
             try {
               const manga = await getMangaById(rec.id);
-
-              // Apply filters
+        
+              // Make filtering more lenient
+              let shouldInclude = true;
+        
               if (input.minScore && (manga.averageScore ?? 0) < input.minScore) {
+                shouldInclude = false;
+              }
+        
+              if (input.genres?.length && 
+                  !input.genres.some(g => manga.genres.includes(g))) {
+                shouldInclude = false;
+              }
+        
+              if (input.excludeGenres?.length && 
+                  input.excludeGenres.some(g => manga.genres.includes(g))) {
+                shouldInclude = false;
+              }
+        
+              if (!shouldInclude) {
                 return null;
               }
-
-              if (input.genres?.length &&
-                !input.genres.some(g => manga.genres.includes(g))) {
-                return null;
-              }
-
-              if (input.excludeGenres?.length &&
-                input.excludeGenres.some(g => manga.genres.includes(g))) {
-                return null;
-              }
-
+        
               return {
                 id: manga.id,
                 title: manga.title.english ?? manga.title.romaji,
@@ -290,12 +298,13 @@ export const recommendationRouter = createTRPCRouter({
           .sort((a, b) => b.similarity - a.similarity)
           .slice(0, input.limit);
 
-        if (validMangaDetails.length === 0) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "No matching recommendations found",
-          });
-        }
+       // Modify the error check to be more informative
+if (validMangaDetails.length === 0) {
+  throw new TRPCError({
+    code: "NOT_FOUND",
+    message: "No recommendations found matching the specified criteria. Try adjusting your filters.",
+  });
+}
 
         // Update cache and history
         const recommendationsWithMetadata = validMangaDetails.map(manga => ({
