@@ -14,6 +14,7 @@ import type {
   ReadingStatus
 } from "~/server/services/recommendations/types";
 import { DEFAULT_CONFIG } from "~/server/services/recommendations/types";
+import { MatrixFactorizationRecommender } from "~/server/services/recommendations/MatrixFactorizationRecommender";
 
 // Simple in-memory cache implementation
 class RecommendationCache {
@@ -470,4 +471,117 @@ export const recommendationRouter = createTRPCRouter({
       throw error;
     }
   }),
+  
+
+  // getMatrixFactorizationRecommendations: protectedProcedure
+  //   .input(z.object({
+  //     limit: z.number().min(1).max(50).default(20),
+  //     excludeIds: z.array(z.number()).default([]),
+  //   }))
+  //   .query(async ({ ctx, input }) => {
+  //     const start = performance.now();
+
+  //     try {
+  //       if (!ctx.auth.userId) {
+  //         throw new TRPCError({
+  //           code: "UNAUTHORIZED",
+  //           message: "User not authenticated",
+  //         });
+  //       }
+
+  //       // Get user's manga list
+  //       const user = await ctx.db.user.findUnique({
+  //         where: { clerkId: ctx.auth.userId },
+  //         include: {
+  //           mangaList: true,
+  //         },
+  //       });
+
+  //       if (!user || !user.mangaList) {
+  //         throw new TRPCError({
+  //           code: "NOT_FOUND",
+  //           message: "User data not found",
+  //         });
+  //       }
+
+  //       const mfRecommender = new MatrixFactorizationRecommender();
+
+  //       // Get recommendations
+  //       const recommendations = await mfRecommender.getRecommendations(
+  //         ctx.auth.userId,
+  //         input.limit,
+  //         new Set(input.excludeIds)
+  //       );
+
+  //       // Fetch manga details for recommendations
+  //       const mangaDetails = await Promise.all(
+  //         recommendations.map(async (rec) => {
+  //           try {
+  //             const manga = await getMangaById(rec.mangaId);
+  //             return {
+  //               id: manga.id,
+  //               title: manga.title.english ?? manga.title.romaji,
+  //               coverImage: manga.coverImage.large,
+  //               averageScore: manga.averageScore ?? 0,
+  //               genres: manga.genres,
+  //               predictedScore: rec.score,
+  //               description: manga.description,
+  //             };
+  //           } catch (error) {
+  //             console.error(`Failed to fetch manga ${rec.mangaId}:`, error);
+  //             return null;
+  //           }
+  //         })
+  //       );
+
+  //       const validMangaDetails = mangaDetails.filter(
+  //         (manga): manga is NonNullable<typeof manga> => manga !== null
+  //       );
+
+  //       return {
+  //         items: validMangaDetails,
+  //         timing: performance.now() - start,
+  //         source: 'matrix-factorization'
+  //       };
+
+  //     } catch (error) {
+  //       console.error('Matrix factorization recommendation error:', error);
+  //       throw error;
+  //     }
+  //   }),
+
+  // // Add route to get model info
+  // getModelInfo: protectedProcedure
+  //   .query(async () => {
+  //     const mfRecommender = new MatrixFactorizationRecommender();
+  //     return mfRecommender.getModelInfo();
+  //   }),
+
+  // // Add procedure to trigger model updates
+  // updateRecommenderModel: protectedProcedure
+  //   .mutation(async ({ ctx }) => {
+  //     const mfRecommender = new MatrixFactorizationRecommender();
+      
+  //     // Get user's latest ratings
+  //     const userRatings = await ctx.db.mangaList.findMany({
+  //       where: { userId: ctx.auth.userId! },
+  //       select: {
+  //         mangaId: true,
+  //         likeStatus: true,
+  //         status: true,
+  //       }
+  //     });
+
+  //     // Map the ratings to match UserMangaItem interface
+  //     const mappedRatings = userRatings.map(rating => ({
+  //       mangaId: rating.mangaId,
+  //       likeStatus: rating.likeStatus as "like" | "dislike" | null,
+  //       readingStatus: rating.status as ReadingStatus
+  //     }));
+
+  //     // Update the model 
+  //     await mfRecommender.updateModel(mappedRatings, ctx.auth.userId!);
+
+  //     return { success: true };
+  //   })
 });

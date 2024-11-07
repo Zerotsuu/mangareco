@@ -110,10 +110,10 @@ export class CollaborativeRecommender {
 
     // Reading status multiplier
     switch (item.readingStatus) {
-      case 'COMPLETED': rating *= 1.1; break;
-      case 'READING': rating *= 1.0; break;
-      case 'PLAN_TO_READ': rating *= 0.9; break;
-      default: rating *= 0.9;
+      case 'COMPLETED': rating *= 1.0; break;
+      case 'READING': rating *= 0.6; break;
+      case 'PLAN_TO_READ': rating *= 0.2; break;
+      default: rating *= 0.2;
     }
 
     return rating;
