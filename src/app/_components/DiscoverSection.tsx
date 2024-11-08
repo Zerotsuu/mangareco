@@ -8,8 +8,8 @@ import { LoadingSpinner } from "./LoadingSpinner";
 export function DiscoverSection() {
   const [excludeIds, setExcludeIds] = useState<number[]>([]);
   
-  const { data, isLoading, error } = api.recommendation.getCollaborativeRecommendations.useQuery({
-    limit: 50,
+  const { data, isLoading, error } = api.recommendation.getHuggingFaceRecommendations.useQuery({
+    limit: 20,
     excludeIds: excludeIds,
   });
 
@@ -43,7 +43,8 @@ export function DiscoverSection() {
           coverImage={manga.coverImage}
           averageScore={manga.averageScore}
           genres={manga.genres}
-          userCount={manga.userCount}
+          // Convert mlScore to a percentage if you want to show it as userCount
+          userCount={manga.mlScore ? Math.round(manga.mlScore * 100) : undefined}
         />
       ))}
       {data.timing && (

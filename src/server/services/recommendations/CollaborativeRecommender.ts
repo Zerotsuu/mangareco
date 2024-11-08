@@ -164,7 +164,7 @@ export class CollaborativeRecommender {
         }
       });
 
-      console.log(`Loading data for ${allUsers.length} users`);
+      // console.log(`Loading data for ${allUsers.length} users`);
 
       // Process all users
       allUsers.forEach(user => {
@@ -228,3 +228,24 @@ export class CollaborativeRecommender {
       .slice(0, limit);
   }
 }
+
+// If two users both liked and completed the same manga:
+
+// User1: 0.8 * 1.0 = 0.8
+// User2: 0.8 * 1.0 = 0.8
+// This contributes positively to similarity
+
+// If they disagree:
+// User1: 0.8 * 1.0 = 0.8 (liked & completed)
+// User2: -0.8 * 1.0 = -0.8 (disliked & completed)
+// This contributes negatively to similarity
+
+// Reading status affects the weight:
+// Completed manga count more
+// Plan-to-read counts less
+// This puts more emphasis on fully experienced manga
+
+// The similarity score will be higher for users who have:
+// More manga in common
+// Similar ratings for those common manga
+// Similar completed/reading patterns

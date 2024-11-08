@@ -280,3 +280,19 @@ export const CACHE_CONFIG = {
   FEATURE_CACHE_SIZE: 1000,
   RESULT_CACHE_SIZE: 100,
 } as const;
+
+export interface HuggingFaceModelInput {
+  user_id: string;
+  manga_id: string;
+  genres: number[];
+}
+
+export interface HuggingFaceModelOutput {
+  score: number;
+}
+
+export interface HuggingFaceRecommendation {
+  mangaId: number;
+  score: number;
+  source: 'huggingface';
+}

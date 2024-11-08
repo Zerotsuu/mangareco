@@ -232,7 +232,7 @@ export const getTrendingManga = async (page: number, perPage: number): Promise<P
     variables,
     cacheKey
   );
-  
+  console.log('Trending manga response:', data);
   return {
     manga: data.Page.media,
     pageInfo: data.Page.pageInfo

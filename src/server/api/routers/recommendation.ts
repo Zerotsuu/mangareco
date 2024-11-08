@@ -11,11 +11,13 @@ import type {
   MangaRecommendation,
   RecommenderConfig,
   CacheEntry,
-  ReadingStatus
+  ReadingStatus,
+  HuggingFaceRecommendation
 } from "~/server/services/recommendations/types";
 import { DEFAULT_CONFIG } from "~/server/services/recommendations/types";
 // import { MatrixFactorizationRecommender } from "~/server/services/recommendations/MatrixFactorizationRecommender";
-
+import { huggingFaceRecommender } from "~/server/services/recommendations/HuggingFaceRecommender";
+import { env } from "~/env";
 class RecommendationCache {
   private cache = new Map<string, CacheEntry<MangaRecommendation[]>>();
   private history = new Map<string, Set<number>>();
@@ -63,6 +65,7 @@ class RecommendationCache {
 // Initialize recommender with error handling and retries
 let recommender: ContentBasedRecommender | null = null;
 let collaborativeRecommender: CollaborativeRecommender | null = null;
+let hfRecommender: huggingFaceRecommender | null = null;
 let initializationPromise: Promise<void> | null = null;
 const cache = new RecommendationCache();
 
@@ -90,7 +93,16 @@ const initializeRecommender = async (retries = 3): Promise<void> => {
     throw error;
   }
 };
-
+// Add this function with other getter functions
+const getHuggingFaceRecommender = (): huggingFaceRecommender => {
+  if (!hfRecommender) {
+    if (!env.HUGGINGFACE_API_KEY) {
+      throw new Error('HuggingFace API key not configured');
+    }
+    hfRecommender = new huggingFaceRecommender(env.HUGGINGFACE_API_KEY);
+  }
+  return hfRecommender;
+};
 // Function to get or initialize recommender
 const getRecommender = async (): Promise<ContentBasedRecommender> => {
   if (recommender) return recommender;
@@ -481,116 +493,147 @@ if (validMangaDetails.length === 0) {
     }
   }),
   
+  getHuggingFaceRecommendations: protectedProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(50).default(20),
+      excludeIds: z.array(z.number()).default([]),
+    }))
+    .query(async ({ ctx, input }) => {
+      const start = performance.now();
 
-  // getMatrixFactorizationRecommendations: protectedProcedure
-  //   .input(z.object({
-  //     limit: z.number().min(1).max(50).default(20),
-  //     excludeIds: z.array(z.number()).default([]),
-  //   }))
-  //   .query(async ({ ctx, input }) => {
-  //     const start = performance.now();
+      if (!ctx.auth.userId) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "User not authenticated",
+        });
+      }
 
-  //     try {
-  //       if (!ctx.auth.userId) {
-  //         throw new TRPCError({
-  //           code: "UNAUTHORIZED",
-  //           message: "User not authenticated",
-  //         });
-  //       }
+      try {
+        const recommender = getHuggingFaceRecommender();
+        // Get user's manga list
+        const user = await ctx.db.user.findUnique({
+          where: { clerkId: ctx.auth.userId },
+          include: {
+            mangaList: {
+              select: {
+                mangaId: true
+              }
+            }
+          },
+        });
 
-  //       // Get user's manga list
-  //       const user = await ctx.db.user.findUnique({
-  //         where: { clerkId: ctx.auth.userId },
-  //         include: {
-  //           mangaList: true,
-  //         },
-  //       });
+        if (!user) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "User not found",
+          });
+        }
 
-  //       if (!user || !user.mangaList) {
-  //         throw new TRPCError({
-  //           code: "NOT_FOUND",
-  //           message: "User data not found",
-  //         });
-  //       }
+        const userMangaIds = new Set(user.mangaList.map(item => item.mangaId));
+        const excludeSet = new Set([...input.excludeIds, ...userMangaIds]);
 
-  //       const mfRecommender = new MatrixFactorizationRecommender();
+        // Get candidate manga
+        const candidates = await ctx.db.manga.findMany({
+          where: {
+            id: {
+              notIn: Array.from(excludeSet)
+            }
+          },
+          select: {
+            id: true,
+            genres: true
+          }
+        });
 
-  //       // Get recommendations
-  //       const recommendations = await mfRecommender.getRecommendations(
-  //         ctx.auth.userId,
-  //         input.limit,
-  //         new Set(input.excludeIds)
-  //       );
+        // Get recommendations
+      const recommendations = await Promise.all(
+        candidates.map(async (manga) => {
+          const score = 0.5;
+          try {
+            if (!ctx.auth.userId) {
+              throw new Error("User ID is required");
+            }
+            let score;
+            try {
+              if (recommender instanceof Error) {
+                throw new Error("Recommender system unavailable");
+              }
+             
+            } catch (e) {
+              console.error(`HuggingFace API error for manga ${manga.id}:`, e);
+              score = 0;
+            }
 
-  //       // Fetch manga details for recommendations
-  //       const mangaDetails = await Promise.all(
-  //         recommendations.map(async (rec) => {
-  //           try {
-  //             const manga = await getMangaById(rec.mangaId);
-  //             return {
-  //               id: manga.id,
-  //               title: manga.title.english ?? manga.title.romaji,
-  //               coverImage: manga.coverImage.large,
-  //               averageScore: manga.averageScore ?? 0,
-  //               genres: manga.genres,
-  //               predictedScore: rec.score,
-  //               description: manga.description,
-  //             };
-  //           } catch (error) {
-  //             console.error(`Failed to fetch manga ${rec.mangaId}:`, error);
-  //             return null;
-  //           }
-  //         })
-  //       );
+            return {
+              mangaId: manga.id,
+              score,
+              source: 'huggingface' as const
+            };
+          } catch (error) {
+            console.error(`Failed to get recommendation for manga ${manga.id}:`, error);
+            return {
+              mangaId: manga.id,
+              score: 0,
+              source: 'huggingface' as const
+            };
+          }
+        })
+      );
 
-  //       const validMangaDetails = mangaDetails.filter(
-  //         (manga): manga is NonNullable<typeof manga> => manga !== null
-  //       );
+        // Sort and get top recommendations
+        const topRecommendations = recommendations
+          .sort((a, b) => b.score - a.score)
+          .slice(0, input.limit);
 
-  //       return {
-  //         items: validMangaDetails,
-  //         timing: performance.now() - start,
-  //         source: 'matrix-factorization'
-  //       };
+        // Fetch full manga details
+        const mangaDetails = await Promise.all(
+          topRecommendations.map(async (rec) => {
+            try {
+              const manga = await getMangaById(rec.mangaId);
+              
+              return manga ? {
+                id: manga.id,
+                title: manga.title.english ?? manga.title.romaji,
+                coverImage: manga.coverImage.large,
+                averageScore: manga.averageScore ?? 0,
+                genres: manga.genres,
+                description: manga.description ?? '',
+                status: manga.status,
+                mlScore: rec.score,
+                source: rec.source
+              } : null;
+            } catch (error) {
+              console.error(`Failed to fetch manga ${rec.mangaId}:`, error);
+              return null;
+            }
+          })
+        );
 
-  //     } catch (error) {
-  //       console.error('Matrix factorization recommendation error:', error);
-  //       throw error;
-  //     }
-  //   }),
+        const validRecommendations = mangaDetails.filter(
+          (manga): manga is NonNullable<typeof manga> => manga !== null
+        );
 
-  // // Add route to get model info
-  // getModelInfo: protectedProcedure
-  //   .query(async () => {
-  //     const mfRecommender = new MatrixFactorizationRecommender();
-  //     return mfRecommender.getModelInfo();
-  //   }),
+        if (validRecommendations.length === 0) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "No recommendations found",
+          });
+        }
 
-  // // Add procedure to trigger model updates
-  // updateRecommenderModel: protectedProcedure
-  //   .mutation(async ({ ctx }) => {
-  //     const mfRecommender = new MatrixFactorizationRecommender();
-      
-  //     // Get user's latest ratings
-  //     const userRatings = await ctx.db.mangaList.findMany({
-  //       where: { userId: ctx.auth.userId! },
-  //       select: {
-  //         mangaId: true,
-  //         likeStatus: true,
-  //         status: true,
-  //       }
-  //     });
+        return {
+          items: validRecommendations,
+          timing: performance.now() - start,
+          source: 'huggingface' as const
+        };
 
-  //     // Map the ratings to match UserMangaItem interface
-  //     const mappedRatings = userRatings.map(rating => ({
-  //       mangaId: rating.mangaId,
-  //       likeStatus: rating.likeStatus as "like" | "dislike" | null,
-  //       readingStatus: rating.status as ReadingStatus
-  //     }));
-
-  //     // Update the model 
-  //     await mfRecommender.updateModel(mappedRatings, ctx.auth.userId!);
-
-  //     return { success: true };
-  //   })
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        
+        console.error('HuggingFace recommendation error:', error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to get recommendations",
+        });
+      }
+    }),
 });
