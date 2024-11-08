@@ -9,7 +9,7 @@ export function DiscoverSection() {
   const [excludeIds, setExcludeIds] = useState<number[]>([]);
   
   const { data, isLoading, error } = api.recommendation.getCollaborativeRecommendations.useQuery({
-    limit: 50,
+    limit: 10,
     excludeIds: excludeIds,
   });
 
